@@ -96,8 +96,57 @@ node server.js --allow-ip 192.168.0.50
 
 ## Requirements
 
-- **Node.js 18+**
+- **Node.js 18+** (only if running from source)
 - Devices on the **same local network** (WiFi or Ethernet)
+
+## Download & Run (No Node.js Required)
+
+Pre-built standalone binaries are available — no need to install Node.js.
+
+| Platform | File |
+|----------|------|
+| macOS (Apple Silicon) | `connectlan-macos-arm64` |
+| macOS (Intel) | `connectlan-macos-x64` |
+| Windows | `connectlan-win-x64.exe` |
+| Linux | `connectlan-linux-x64` |
+
+```bash
+# macOS / Linux
+chmod +x connectlan-macos-arm64
+./connectlan-macos-arm64
+
+# Windows
+connectlan-win-x64.exe
+```
+
+> **macOS Gatekeeper:** If you see "cannot be opened because the developer cannot be verified", run:
+> ```bash
+> xattr -d com.apple.quarantine connectlan-macos-arm64
+> ```
+
+All [CLI options](#cli-options) work the same with the binary (e.g., `./connectlan-macos-arm64 --no-tls --port 8080`).
+
+## Building from Source
+
+Build standalone executables for all platforms:
+
+```bash
+# Install dependencies
+npm install
+
+# Build all platforms (macOS arm64+x64, Windows x64, Linux x64)
+npm run build
+
+# Or build for a specific platform
+npm run build:mac-arm64
+npm run build:mac-x64
+npm run build:win
+npm run build:linux
+```
+
+Binaries are output to the `dist/` folder (~65 MB each).
+
+> **Note:** The first build downloads the Node.js base binary for each target platform (~40 MB each). These are cached in `~/.pkg-cache/` for subsequent builds.
 
 ## License
 

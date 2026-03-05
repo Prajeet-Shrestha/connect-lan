@@ -18,9 +18,9 @@ function setupWebSocket(wss, validateAuth) {
   wss.on('connection', (ws, req) => {
     const ip = req.socket.remoteAddress;
     
-    // Auth check
+    // Auth check (pass socket IP for localhost auto-auth)
     const cookie = req.headers.cookie || '';
-    if (!validateAuth(cookie)) {
+    if (!validateAuth(cookie, ip)) {
       ws.close(1008, 'Authentication required');
       return;
     }

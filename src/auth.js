@@ -12,6 +12,14 @@ function generatePin() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
+// Check if the request originates from the host machine (loopback)
+// Uses socket-level IP to prevent X-Forwarded-For spoofing
+function isLocalhostSocket(socketAddress) {
+  if (!socketAddress) return false;
+  const addr = socketAddress.replace('::ffff:', '');
+  return addr === '127.0.0.1' || addr === '::1';
+}
+
 function generateSessionToken() {
   return crypto.randomBytes(32).toString('hex');
 }
@@ -24,25 +32,39 @@ function createAuthMiddleware(pin) {
     }
     
     const token = parseCookie(req.headers.cookie, 'session');
-    if (!token || !sessions.has(token)) {
-      return res.status(401).json({ error: 'Authentication required' });
+    if (token && sessions.has(token)) {
+      const session = sessions.get(token);
+      // Check expiry
+      if (Date.now() - session.createdAt > SESSION_EXPIRY) {
+        sessions.delete(token);
+        return res.status(401).json({ error: 'Session expired' });
+      }
+      // Bind to IP
+      const clientIp = req.ip || req.connection.remoteAddress;
+      if (session.ip !== clientIp) {
+        return res.status(401).json({ error: 'Session invalid' });
+      }
+      req.sessionToken = token;
+      return next();
     }
     
-    const session = sessions.get(token);
-    // Check expiry
-    if (Date.now() - session.createdAt > SESSION_EXPIRY) {
-      sessions.delete(token);
-      return res.status(401).json({ error: 'Session expired' });
+    // No valid session — auto-authenticate localhost (host machine)
+    if (isLocalhostSocket(req.socket.remoteAddress)) {
+      const clientIp = req.ip || req.connection.remoteAddress;
+      const newToken = generateSessionToken();
+      sessions.set(newToken, { ip: clientIp, createdAt: Date.now() });
+      res.cookie('session', newToken, {
+        httpOnly: true,
+        secure: req.secure,
+        sameSite: 'strict',
+        maxAge: SESSION_EXPIRY,
+        path: '/',
+      });
+      req.sessionToken = newToken;
+      return next();
     }
     
-    // Bind to IP
-    const clientIp = req.ip || req.connection.remoteAddress;
-    if (session.ip !== clientIp) {
-      return res.status(401).json({ error: 'Session invalid' });
-    }
-    
-    req.sessionToken = token;
-    next();
+    return res.status(401).json({ error: 'Authentication required' });
   };
 }
 
@@ -106,7 +128,10 @@ function handleLogout(req, res) {
   return res.json({ success: true });
 }
 
-function validateWsAuth(cookie) {
+function validateWsAuth(cookie, socketIp) {
+  // Auto-authenticate localhost WebSocket connections
+  if (isLocalhostSocket(socketIp)) return true;
+  
   const token = parseCookie(cookie, 'session');
   if (!token || !sessions.has(token)) return false;
   const session = sessions.get(token);

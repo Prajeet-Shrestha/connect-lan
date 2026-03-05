@@ -27,14 +27,30 @@ function getDiskSpace(dirPath) {
   try {
     if (process.platform === 'win32') {
       const drive = path.parse(dirPath).root;
-      const out = execSync(`wmic logicaldisk where "DeviceID='${drive.replace('\\', '')}'" get FreeSpace,Size /format:csv`, { encoding: 'utf8' });
-      const lines = out.trim().split('\n').filter(l => l.trim());
-      if (lines.length >= 2) {
-        const parts = lines[lines.length - 1].split(',');
-        return { free: parseInt(parts[1]), total: parseInt(parts[2]) };
+      const driveLetter = drive[0]; // 'C' from 'C:\\'
+      try {
+        // PowerShell (Win10+, required on Win11 25H2+)
+        const out = execSync(
+          `powershell -NoProfile -c "(Get-PSDrive ${driveLetter} | Select-Object Free,Used | ConvertTo-Json)"`,
+          { encoding: 'utf8', timeout: 5000 }
+        );
+        const info = JSON.parse(out.trim());
+        return { free: info.Free, total: info.Free + info.Used, used: info.Used };
+      } catch (e) {
+        // Fallback: wmic (older Windows)
+        const deviceId = drive.replace('\\', ''); // 'C:'
+        const out = execSync(
+          `wmic logicaldisk where "DeviceID='${deviceId}'" get FreeSpace,Size /format:csv`,
+          { encoding: 'utf8', timeout: 5000 }
+        );
+        const lines = out.trim().split('\n').filter(l => l.trim());
+        if (lines.length >= 2) {
+          const parts = lines[lines.length - 1].split(',');
+          return { free: parseInt(parts[1]), total: parseInt(parts[2]) };
+        }
       }
     } else {
-      const out = execSync(`df -k "${dirPath}"`, { encoding: 'utf8' });
+      const out = execSync(`df -k "${dirPath}"`, { encoding: 'utf8', timeout: 5000 });
       const lines = out.trim().split('\n');
       if (lines.length >= 2) {
         const parts = lines[1].split(/\s+/);
