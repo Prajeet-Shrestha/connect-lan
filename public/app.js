@@ -38,7 +38,8 @@
   const dom = {
     loginPage: $('#login-page'),
     loginForm: $('#login-form'),
-    pinInput: $('#pin-input'),
+    pinDigits: Array.from(document.querySelectorAll('.pin-digit')),
+    deviceNameInput: $('#device-name-input'),
     loginError: $('#login-error'),
     tlsHint: $('#tls-hint'),
     app: $('#app'),
@@ -108,6 +109,7 @@
   // ─── Init ───────────────────────────────────────────
   async function init() {
     detectDevice();
+    setupPinInputs();
     setupEventListeners();
     
     if (location.protocol === 'https:') {
@@ -134,11 +136,64 @@
     else { state.deviceOS = 'Unknown'; state.deviceHostname = 'Device'; }
   }
 
+  // ─── Segmented PIN Input ────────────────────────────
+  function setupPinInputs() {
+    dom.pinDigits.forEach((input, i) => {
+      input.addEventListener('input', (e) => {
+        const val = e.target.value.replace(/[^0-9]/g, '');
+        e.target.value = val.slice(0, 1);
+        e.target.classList.toggle('filled', !!e.target.value);
+        if (val && i < 5) dom.pinDigits[i + 1].focus();
+        // Auto-submit when all 6 digits are entered
+        if (getPin().length === 6) dom.loginForm.requestSubmit();
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !e.target.value && i > 0) {
+          dom.pinDigits[i - 1].value = '';
+          dom.pinDigits[i - 1].classList.remove('filled');
+          dom.pinDigits[i - 1].focus();
+        }
+        if (e.key === 'ArrowLeft' && i > 0) dom.pinDigits[i - 1].focus();
+        if (e.key === 'ArrowRight' && i < 5) dom.pinDigits[i + 1].focus();
+      });
+      input.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData.getData('text') || '').replace(/[^0-9]/g, '').slice(0, 6);
+        for (let j = 0; j < 6; j++) {
+          dom.pinDigits[j].value = text[j] || '';
+          dom.pinDigits[j].classList.toggle('filled', !!dom.pinDigits[j].value);
+        }
+        const nextEmpty = text.length < 6 ? text.length : 5;
+        dom.pinDigits[nextEmpty].focus();
+        if (text.length === 6) dom.loginForm.requestSubmit();
+      });
+      input.addEventListener('focus', () => input.select());
+    });
+  }
+
+  function getPin() {
+    return dom.pinDigits.map(d => d.value).join('');
+  }
+
+  function clearPin() {
+    dom.pinDigits.forEach(d => { d.value = ''; d.classList.remove('filled'); });
+    dom.pinDigits[0].focus();
+  }
+
   // ─── Auth ───────────────────────────────────────────
   dom.loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const pin = dom.pinInput.value.trim();
-    if (!pin) return;
+    const pin = getPin();
+    if (pin.length !== 6) {
+      dom.pinDigits[dom.pinDigits.findIndex(d => !d.value) || 0].focus();
+      return;
+    }
+    
+    // Capture custom device name before clearing
+    const customName = dom.deviceNameInput.value.trim();
+    if (customName) {
+      state.deviceHostname = customName + ' (' + state.deviceOS + ')';
+    }
     
     dom.loginError.textContent = '';
     try {
@@ -153,8 +208,7 @@
         showApp(info);
       } else {
         dom.loginError.textContent = data.error || 'Invalid PIN';
-        dom.pinInput.value = '';
-        dom.pinInput.focus();
+        clearPin();
       }
     } catch (e) {
       dom.loginError.textContent = 'Connection failed';
@@ -307,6 +361,10 @@
     state.isHost = false;
     dom.app.classList.add('hidden');
     dom.loginPage.classList.remove('hidden');
+    dom.deviceNameInput.value = '';
+    clearPin();
+    // Reset hostname to default OS-detected name
+    detectDevice();
     if (reason) {
       showToast('info', reason);
     }

@@ -19,8 +19,17 @@
       <h1 class="login-title">ConnectLAN</h1>
       <p class="login-subtitle">Enter the PIN shown on the server terminal</p>
       <form id="login-form" autocomplete="off">
-        <div class="pin-input-group">
-          <input type="text" id="pin-input" class="pin-input" maxlength="6" placeholder="• • • • • •" autocomplete="off" inputmode="numeric" pattern="[0-9]*">
+        <div class="pin-input-group" id="pin-input-group">
+          <input type="text" class="pin-digit" maxlength="1" autocomplete="off" inputmode="numeric" pattern="[0-9]*" data-index="0">
+          <input type="text" class="pin-digit" maxlength="1" autocomplete="off" inputmode="numeric" pattern="[0-9]*" data-index="1">
+          <input type="text" class="pin-digit" maxlength="1" autocomplete="off" inputmode="numeric" pattern="[0-9]*" data-index="2">
+          <span class="pin-separator">–</span>
+          <input type="text" class="pin-digit" maxlength="1" autocomplete="off" inputmode="numeric" pattern="[0-9]*" data-index="3">
+          <input type="text" class="pin-digit" maxlength="1" autocomplete="off" inputmode="numeric" pattern="[0-9]*" data-index="4">
+          <input type="text" class="pin-digit" maxlength="1" autocomplete="off" inputmode="numeric" pattern="[0-9]*" data-index="5">
+        </div>
+        <div class="device-name-group">
+          <input type="text" id="device-name-input" class="device-name-input" maxlength="30" placeholder="Device name (optional)" autocomplete="off">
         </div>
         <div id="login-error" class="login-error"></div>
         <button type="submit" class="login-btn">Connect</button>

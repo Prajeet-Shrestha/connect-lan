@@ -68,15 +68,17 @@ html, body {
   font-size: 28px; font-weight: 600; letter-spacing: -0.5px; margin-bottom: 8px; 
 }
 .login-subtitle { color: var(--text-secondary); margin-bottom: 32px; font-size: 14px; }
-.pin-input-group { margin-bottom: 16px; }
-.pin-input {
-  width: 100%; padding: 14px; font-size: 24px; letter-spacing: 12px;
+.pin-input-group { margin-bottom: 16px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.pin-digit {
+  width: 40px; height: 48px; font-size: 22px; font-weight: 600;
   text-align: center; background: var(--bg-input);
   border: 1px solid var(--divider); border-radius: var(--radius);
-  color: var(--text-primary); outline: none;
-  font-family: var(--font); transition: border-color 0.2s;
+  color: var(--text-primary); outline: none; caret-color: var(--accent);
+  font-family: var(--font); transition: border-color 0.2s, transform 0.15s;
 }
-.pin-input:focus { border-color: var(--accent); }
+.pin-digit:focus { border-color: var(--accent); transform: scale(1.05); }
+.pin-digit.filled { border-color: rgba(0,122,255,0.4); }
+.pin-separator { color: var(--text-tertiary); font-size: 18px; font-weight: 300; user-select: none; }
 .login-error { 
   color: var(--red); font-size: 12px; min-height: 20px; margin-bottom: 12px; 
 }
@@ -88,6 +90,16 @@ html, body {
 }
 .login-btn:hover { background: var(--accent-hover); }
 .login-hint { color: var(--text-tertiary); font-size: 11px; margin-top: 20px; line-height: 1.4; }
+.device-name-group { margin-bottom: 16px; }
+.device-name-input {
+  width: 100%; padding: 10px 14px; font-size: 14px;
+  text-align: center; background: var(--bg-input);
+  border: 1px solid var(--divider); border-radius: var(--radius);
+  color: var(--text-primary); outline: none;
+  font-family: var(--font); transition: border-color 0.2s;
+}
+.device-name-input:focus { border-color: var(--accent); }
+.device-name-input::placeholder { color: var(--text-tertiary); }
 
 /* =====================================================
    APP LAYOUT
