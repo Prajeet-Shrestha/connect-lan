@@ -112,10 +112,18 @@
     connectPin: $('#connect-pin'),
     connectRefreshPin: $('#connect-refresh-pin'),
     connectTlsStep: $('#connect-tls-step'),
+    // Folder dialog
+    folderDialogOverlay: $('#folder-dialog-overlay'),
+    folderNameInput: $('#folder-name-input'),
+    folderDialogCancel: $('#folder-dialog-cancel'),
+    folderDialogCreate: $('#folder-dialog-create'),
     // Hidden inputs
     fileInput: $('#file-input'),
     folderInput: $('#folder-input'),
   };
+
+  // ─── Electron Detection ─────────────────────────────
+  const isElectron = !!(window.electronAPI);
 
   // ─── Init ───────────────────────────────────────────
   async function init() {
@@ -123,9 +131,16 @@
     setupPinInputs();
     setupEventListeners();
     
-    if (location.protocol === 'https:') {
+    if (location.protocol === 'https:' && !isElectron) {
       dom.tlsHint.textContent = 'If you see a security warning, click "Advanced" → "Proceed" to continue.';
     }
+    if (isElectron && dom.tlsHint) {
+      dom.tlsHint.style.display = 'none';
+    }
+
+    // Global drop prevention: prevent Electron from navigating to dropped files
+    document.addEventListener('dragover', (e) => e.preventDefault());
+    document.addEventListener('drop', (e) => e.preventDefault());
 
     // Check if already authenticated
     try {
@@ -770,29 +785,55 @@
   }
 
   async function createFolder() {
-    const name = prompt('New folder name:', 'New Folder');
-    if (!name) return;
-    
-    try {
-      const res = await fetch('/api/mkdir', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: state.currentPath, name }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        showToast('success', `Created "${data.name}"`);
-        // Auto-clear filter if viewing another device's files
-        if (state.filterDeviceId && state.filterDeviceId !== state.deviceId) {
-          state.filterDeviceId = null;
+    return new Promise((resolve) => {
+      dom.folderNameInput.value = 'New Folder';
+      dom.folderDialogOverlay.classList.remove('hidden');
+      dom.folderNameInput.focus();
+      dom.folderNameInput.select();
+
+      const cleanup = () => {
+        dom.folderDialogOverlay.classList.add('hidden');
+        dom.folderDialogCreate.removeEventListener('click', onCreate);
+        dom.folderDialogCancel.removeEventListener('click', onCancel);
+        dom.folderNameInput.removeEventListener('keydown', onKey);
+      };
+
+      const doCreate = async (name) => {
+        cleanup();
+        if (!name || !name.trim()) { resolve(); return; }
+        try {
+          const res = await fetch('/api/mkdir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: state.currentPath, name: name.trim() }),
+          });
+          const data = await res.json();
+          if (res.ok) {
+            showToast('success', `Created "${data.name}"`);
+            if (state.filterDeviceId && state.filterDeviceId !== state.deviceId) {
+              state.filterDeviceId = null;
+            }
+            loadFiles(state.currentPath);
+          } else {
+            showToast('error', data.error || 'Failed to create folder');
+          }
+        } catch (e) {
+          showToast('error', 'Failed to create folder');
         }
-        loadFiles(state.currentPath);
-      } else {
-        showToast('error', data.error || 'Failed to create folder');
-      }
-    } catch (e) {
-      showToast('error', 'Failed to create folder');
-    }
+        resolve();
+      };
+
+      const onCreate = () => doCreate(dom.folderNameInput.value);
+      const onCancel = () => { cleanup(); resolve(); };
+      const onKey = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); doCreate(dom.folderNameInput.value); }
+        if (e.key === 'Escape') { cleanup(); resolve(); }
+      };
+
+      dom.folderDialogCreate.addEventListener('click', onCreate);
+      dom.folderDialogCancel.addEventListener('click', onCancel);
+      dom.folderNameInput.addEventListener('keydown', onKey);
+    });
   }
 
   function startRename(file) {
@@ -1314,6 +1355,7 @@
     
     // Delete key
     if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault(); // Prevent Electron browser back navigation
       if (state.selectedFiles.size === 1) {
         const idx = [...state.selectedFiles][0];
         confirmDelete(state.files[idx]);

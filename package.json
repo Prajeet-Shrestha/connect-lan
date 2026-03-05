@@ -2,19 +2,69 @@
   "name": "connectlan",
   "version": "1.0.0",
   "description": "Finder-inspired LAN file transfer application",
-  "main": "server.js",
+  "main": "electron/main.js",
   "bin": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js --no-tls",
+    "electron:dev": "ELECTRON_ENABLE_LOGGING=0 electron .",
+    "electron:build": "electron-builder",
+    "electron:build:mac": "electron-builder --mac",
+    "electron:build:win": "electron-builder --win",
+    "electron:build:linux": "electron-builder --linux",
+    "electron:build:all": "electron-builder -mwl",
     "build": "pkg .",
     "build:mac-arm64": "pkg . --target node22-macos-arm64 --out-path dist",
     "build:mac-x64": "pkg . --target node22-macos-x64 --out-path dist",
     "build:win": "pkg . --target node22-win-x64 --out-path dist",
     "build:linux": "pkg . --target node22-linux-x64 --out-path dist"
   },
+  "build": {
+    "appId": "com.connectlan.app",
+    "productName": "ConnectLAN",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "server.js",
+      "src/**",
+      "public/**",
+      "electron/**",
+      "package.json",
+      "!dist/**",
+      "!dist-electron/**",
+      "!public/font/Inter-*Italic*",
+      "!public/font/Inter-Black*",
+      "!public/font/Inter-ExtraBold*",
+      "!public/font/Inter-ExtraLight*",
+      "!public/font/Inter-Thin*",
+      "!public/font/Inter-Bold*"
+    ],
+    "asar": true,
+    "mac": {
+      "target": ["dmg"],
+      "icon": "build/icon.png",
+      "category": "public.app-category.utilities"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "build/icon.png",
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
   "pkg": {
-    "assets": ["public/**/*"],
+    "assets": [
+      "public/**/*"
+    ],
     "targets": [
       "node22-macos-arm64",
       "node22-macos-x64",
@@ -40,6 +90,8 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@yao-pkg/pkg": "^6.14.1"
+    "@yao-pkg/pkg": "^6.14.1",
+    "electron": "^40.7.0",
+    "electron-builder": "^26.8.1"
   }
 }

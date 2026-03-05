@@ -153,7 +153,10 @@ html, body {
   -webkit-app-region: drag;
   flex-shrink: 0;
 }
-.toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 10px; }
+.toolbar-left, .toolbar-right {
+  display: flex; align-items: center; gap: 10px;
+  -webkit-app-region: no-drag;
+}
 .toolbar-right { flex-shrink: 0; }
 
 .traffic-lights { display: flex; gap: 6px; margin-right: 8px; }
@@ -598,6 +601,16 @@ html, body {
 .dialog-cancel:hover { background: rgba(255,255,255,0.12); }
 .dialog-confirm { background: var(--red); color: #fff; }
 .dialog-confirm:hover { background: #ff5349; }
+.dialog-input {
+  width: 100%; padding: 8px 12px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--divider);
+  border-radius: 6px; font-size: 13px;
+  font-family: var(--font); color: var(--text-primary);
+  outline: none; margin-bottom: 16px;
+  transition: border-color 0.15s;
+}
+.dialog-input:focus { border-color: var(--accent); }
 
 /* =====================================================
    PROGRESS OVERLAY
@@ -919,3 +932,19 @@ html, body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+/* =====================================================
+   ELECTRON OVERRIDES
+   ===================================================== */
+.electron .traffic-lights { display: none; }
+.electron .app { border-radius: 0; }
+/* macOS: space for native traffic lights with hiddenInset titlebar */
+@supports (-webkit-app-region: drag) {
+  .electron .toolbar { padding-left: 78px; }
+}
+.electron .breadcrumb, .electron .search-input,
+.electron .sort-select, .electron .nav-btn,
+.electron .toolbar-btn, .electron .hamburger-btn {
+  -webkit-app-region: no-drag;
+}
+

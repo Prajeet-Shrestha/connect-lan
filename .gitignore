@@ -8,3 +8,4 @@ shared/
 dist/
 coverage/
 *.log
+dist-electron/
