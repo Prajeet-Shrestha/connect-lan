@@ -1,4 +1,4 @@
-# ConnectLAN
+# NearDrop
 
 A **Finder-inspired LAN file transfer** app — share files, folders, and messages between any devices on the same local network. No cloud, no accounts, no app installs.
 
@@ -37,7 +37,7 @@ The terminal will display:
 
 ```
   ╔═══════════════════════════════════════════╗
-  ║         🔗 ConnectLAN v1.0.0              ║
+  ║         🔗 NearDrop v1.0.0                ║
   ╚═══════════════════════════════════════════╝
 
   🔑 PIN:  482019
@@ -105,26 +105,26 @@ Pre-built standalone binaries are available — no need to install Node.js.
 
 | Platform | File |
 |----------|------|
-| macOS (Apple Silicon) | `connectlan-macos-arm64` |
-| macOS (Intel) | `connectlan-macos-x64` |
-| Windows | `connectlan-win-x64.exe` |
-| Linux | `connectlan-linux-x64` |
+| macOS (Apple Silicon) | `neardrop-macos-arm64` |
+| macOS (Intel) | `neardrop-macos-x64` |
+| Windows | `neardrop-win-x64.exe` |
+| Linux | `neardrop-linux-x64` |
 
 ```bash
 # macOS / Linux
-chmod +x connectlan-macos-arm64
-./connectlan-macos-arm64
+chmod +x neardrop-macos-arm64
+./neardrop-macos-arm64
 
 # Windows
-connectlan-win-x64.exe
+neardrop-win-x64.exe
 ```
 
 > **macOS Gatekeeper:** If you see "cannot be opened because the developer cannot be verified", run:
 > ```bash
-> xattr -d com.apple.quarantine connectlan-macos-arm64
+> xattr -d com.apple.quarantine neardrop-macos-arm64
 > ```
 
-All [CLI options](#cli-options) work the same with the binary (e.g., `./connectlan-macos-arm64 --no-tls --port 8080`).
+All [CLI options](#cli-options) work the same with the binary (e.g., `./neardrop-macos-arm64 --no-tls --port 8080`).
 
 ## Building from Source
 

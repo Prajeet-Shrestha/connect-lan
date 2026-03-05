@@ -75,7 +75,7 @@ async function startServer(overrides = {}) {
   if (config.noTls) {
     server = http.createServer(app);
   } else {
-    const certDir = path.join(os.homedir(), '.connectlan');
+    const certDir = path.join(os.homedir(), '.neardrop');
     const certPath = path.join(certDir, 'cert.pem');
     const keyPath = path.join(certDir, 'key.pem');
     
@@ -86,7 +86,7 @@ async function startServer(overrides = {}) {
       console.log('\x1b[33mGenerating self-signed TLS certificate...\x1b[0m');
       try {
         const pems = await selfsigned.generate(
-          [{ name: 'commonName', value: 'ConnectLAN' }],
+          [{ name: 'commonName', value: 'NearDrop' }],
           { keySize: 2048, algorithm: 'sha256' }
         );
         fs.writeFileSync(keyPath, pems.private);
@@ -190,7 +190,7 @@ async function startServer(overrides = {}) {
       
       console.log('');
       console.log('\x1b[1m\x1b[36m  ╔═══════════════════════════════════════════╗\x1b[0m');
-      console.log('\x1b[1m\x1b[36m  ║         🔗 ConnectLAN v1.0.0              ║\x1b[0m');
+      console.log('\x1b[1m\x1b[36m  ║         🔗 NearDrop v1.0.0                ║\x1b[0m');
       console.log('\x1b[1m\x1b[36m  ╚═══════════════════════════════════════════╝\x1b[0m');
       console.log('');
       console.log(`  \x1b[1m🔑 PIN:\x1b[0m  \x1b[33m\x1b[1m${pinStore.current}\x1b[0m`);

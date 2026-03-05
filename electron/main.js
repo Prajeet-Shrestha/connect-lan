@@ -127,7 +127,7 @@ function createTray() {
   if (!trayIcon) return; // Can't create tray without icon
 
   tray = new Tray(trayIcon);
-  tray.setToolTip('ConnectLAN');
+  tray.setToolTip('NearDrop');
   updateTrayMenu();
 
   tray.on('double-click', () => {
@@ -148,7 +148,7 @@ function updateTrayMenu() {
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Show ConnectLAN',
+      label: 'Show NearDrop',
       click: () => {
         if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
       }
@@ -286,7 +286,7 @@ app.whenReady().then(async () => {
   try {
     serverPort = await findFreePort(51337, 51347);
   } catch (e) {
-    dialog.showErrorBox('ConnectLAN', `Could not find a free port (51337-51347): ${e.message}`);
+    dialog.showErrorBox('NearDrop', `Could not find a free port (51337-51347): ${e.message}`);
     app.quit();
     return;
   }
@@ -296,7 +296,7 @@ app.whenReady().then(async () => {
     const { startServer } = require(path.join(__dirname, '..', 'server.js'));
     serverInstance = await startServer({ port: serverPort, embedded: true, noTls: true });
   } catch (e) {
-    dialog.showErrorBox('ConnectLAN', `Server failed to start: ${e.message}`);
+    dialog.showErrorBox('NearDrop', `Server failed to start: ${e.message}`);
     app.quit();
     return;
   }
@@ -342,7 +342,7 @@ app.on('activate', () => {
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
   try {
-    dialog.showErrorBox('ConnectLAN Error', `An unexpected error occurred:\n${err.message}`);
+    dialog.showErrorBox('NearDrop Error', `An unexpected error occurred:\n${err.message}`);
   } catch (e) { /* dialog may fail during shutdown */ }
 });
 

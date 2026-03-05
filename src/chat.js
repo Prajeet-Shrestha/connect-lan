@@ -239,7 +239,7 @@ function getDeviceByIp(ip) {
 let registryPath = null;
 
 function setRegistryPath(sharedDir) {
-  registryPath = path.join(sharedDir, '.connectlan-devices.json');
+  registryPath = path.join(sharedDir, '.neardrop-devices.json');
 }
 
 function loadDeviceRegistry() {

@@ -1,5 +1,5 @@
 {
-  "name": "connectlan",
+  "name": "neardrop",
   "version": "1.0.0",
   "description": "Finder-inspired LAN file transfer application",
   "main": "electron/main.js",
@@ -20,8 +20,8 @@
     "build:linux": "pkg . --target node22-linux-x64 --out-path dist"
   },
   "build": {
-    "appId": "com.connectlan.app",
-    "productName": "ConnectLAN",
+    "appId": "com.neardrop.app",
+    "productName": "NearDrop",
     "directories": {
       "output": "dist-electron"
     },

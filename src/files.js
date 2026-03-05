@@ -11,8 +11,8 @@ const { formatBytes, getFileKind, getFileIconType, isImageFile, generateConflict
 function createFileRoutes(config, broadcast, pinStore, getDeviceByIp, loadDeviceRegistry) {
   const router = express.Router();
   const rootDir = config.dir;
-  const tempDir = path.join(rootDir, '.connectlan-tmp');
-  const metaPath = path.join(rootDir, '.connectlan-meta.json');
+  const tempDir = path.join(rootDir, '.neardrop-tmp');
+  const metaPath = path.join(rootDir, '.neardrop-meta.json');
   const maxUploadSize = config.maxUploadSize || 10 * 1024 * 1024 * 1024; // 10GB
 
   // ─── Upload Metadata Store ───────────────────────────
@@ -180,7 +180,7 @@ function createFileRoutes(config, broadcast, pinStore, getDeviceByIp, loadDevice
       
       for (const entry of entries) {
         // Skip temp dir and meta file
-        if (entry.name === '.connectlan-tmp' || entry.name === '.connectlan-meta.json' || entry.name === '.connectlan-devices.json') continue;
+        if (entry.name === '.neardrop-tmp' || entry.name === '.neardrop-meta.json' || entry.name === '.neardrop-devices.json') continue;
         // Skip dotfiles unless requested
         if (!showHidden && entry.name.startsWith('.')) continue;
         
@@ -538,7 +538,7 @@ function createFileRoutes(config, broadcast, pinStore, getDeviceByIp, loadDevice
           const entries = await fs.promises.readdir(dir, { withFileTypes: true });
           for (const entry of entries) {
             if (results.length >= MAX_RESULTS) break;
-            if (entry.name.startsWith('.') || entry.name === '.connectlan-tmp') continue;
+            if (entry.name.startsWith('.') || entry.name === '.neardrop-tmp') continue;
             
             if (entry.name.toLowerCase().includes(query)) {
               const fullPath = path.join(dir, entry.name);
