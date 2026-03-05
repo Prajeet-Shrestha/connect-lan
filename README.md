@@ -17,6 +17,12 @@ A **Finder-inspired LAN file transfer** app — share files, folders, and messag
 - **Security** — CSP headers, rate limiting, path traversal protection, CORS enforcement, optional IP allowlist
 - **Auto-update** — Electron app checks GitHub Releases for updates
 
+### Security Notes
+
+- **File types:** All file types are accepted by design — NearDrop is a general-purpose LAN file transfer tool, not a content filter.
+- **Electron & TLS:** The desktop app uses HTTP for local connections. Other devices on the LAN also connect via HTTP. For the CLI server, TLS is enabled by default with a self-signed certificate; use `--no-tls` to disable.
+- **PIN auth:** A 6-digit cryptographically random PIN is generated on each start and required for access from non-host devices.
+
 ## Install
 
 ### One-liner (macOS / Linux)
@@ -170,6 +176,8 @@ npm run build:linux
 Binaries are output to the `dist/` folder (~65 MB each).
 
 > **Note:** The first build downloads the Node.js base binary for each target platform (~40 MB each). These are cached in `~/.pkg-cache/` for subsequent builds.
+
+> **`pkg` vs `electron-builder`:** `pkg` produces standalone CLI binaries (no GUI) for headless/server use. `electron-builder` produces desktop app installers (DMG, AppImage, EXE) with the full GUI. Use Electron builds for end users and pkg builds for server deployments.
 
 ## Releasing
 
