@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, interactive-widget=resizes-visual">
+  <title>ConnectLAN</title>
+  <meta name="description" content="Finder-inspired LAN file transfer — share files seamlessly between any devices">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <!-- LOGIN PAGE -->
+  <div id="login-page" class="login-page">
+    <div class="login-card">
+      <div class="login-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg></div>
+      <h1 class="login-title">ConnectLAN</h1>
+      <p class="login-subtitle">Enter the PIN shown on the server terminal</p>
+      <form id="login-form" autocomplete="off">
+        <div class="pin-input-group">
+          <input type="text" id="pin-input" class="pin-input" maxlength="6" placeholder="• • • • • •" autocomplete="off" inputmode="numeric" pattern="[0-9]*">
+        </div>
+        <div id="login-error" class="login-error"></div>
+        <button type="submit" class="login-btn">Connect</button>
+      </form>
+      <p class="login-hint" id="tls-hint"></p>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app" class="app hidden">
+    <!-- TOOLBAR -->
+    <div class="toolbar" id="toolbar">
+      <div class="toolbar-left">
+        <button class="hamburger" id="hamburger"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <div class="traffic-lights">
+          <span class="dot red"></span>
+          <span class="dot yellow"></span>
+          <span class="dot green"></span>
+        </div>
+        <div class="nav-buttons">
+          <button class="nav-btn" id="btn-back" title="Back" disabled>
+            <svg width="12" height="12" viewBox="0 0 12 12"><path d="M8 1L3 6l5 5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="nav-btn" id="btn-forward" title="Forward" disabled>
+            <svg width="12" height="12" viewBox="0 0 12 12"><path d="M4 1l5 5-5 5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="breadcrumb" id="breadcrumb">
+          <span class="breadcrumb-item" data-path="">Shared Files</span>
+        </div>
+      </div>
+      <div class="toolbar-right">
+        <div class="view-modes">
+          <button class="view-btn active" id="btn-icon-view" title="Icon View">
+            <svg width="16" height="16" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor"/><rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor"/></svg>
+          </button>
+          <button class="view-btn" id="btn-list-view" title="List View">
+            <svg width="16" height="16" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="2" rx="0.5" fill="currentColor"/><rect x="1" y="7" width="14" height="2" rx="0.5" fill="currentColor"/><rect x="1" y="12" width="14" height="2" rx="0.5" fill="currentColor"/></svg>
+          </button>
+        </div>
+        <div class="toolbar-divider"></div>
+        <select class="sort-select" id="sort-select">
+          <option value="name-asc">Name ↑</option>
+          <option value="name-desc">Name ↓</option>
+          <option value="date-desc">Date Modified ↓</option>
+          <option value="date-asc">Date Modified ↑</option>
+          <option value="size-desc">Size ↓</option>
+          <option value="size-asc">Size ↑</option>
+          <option value="kind-asc">Kind</option>
+        </select>
+        <div class="toolbar-divider"></div>
+        <button class="toolbar-btn" id="btn-upload" title="Upload Files">
+          <svg width="16" height="16" viewBox="0 0 16 16"><path d="M8 2v8M4 6l4-4 4 4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg>
+        </button>
+        <button class="toolbar-btn" id="btn-new-folder" title="New Folder">
+          <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 3h4l2 2h6v8H2V3z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/><path d="M8 7v4M6 9h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="toolbar-divider"></div>
+        <div class="search-container">
+          <svg class="search-icon" width="14" height="14" viewBox="0 0 14 14"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M9.5 9.5L13 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <input type="text" class="search-input" id="search-input" placeholder="Search">
+        </div>
+      </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-wrapper">
+      <!-- SIDEBAR BACKDROP (MOBILE) -->
+      <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+      <!-- SIDEBAR -->
+      <div class="sidebar" id="sidebar">
+        <div class="sidebar-section">
+          <div class="sidebar-header">Favorites</div>
+          <div class="sidebar-item active" data-path="" id="sidebar-home">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 16 16"><path d="M2 7l6-5 6 5v6a1 1 0 01-1 1H3a1 1 0 01-1-1V7z" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M6 14V9h4v5" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+            <span>Shared Files</span>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-header">Locations</div>
+          <div class="sidebar-item" id="sidebar-this-device">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M5 14h6M8 11v3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <span id="this-device-name">This Device</span>
+          </div>
+          <div id="connected-devices"></div>
+          <div class="sidebar-item sidebar-connect" id="btn-connect-device">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3"/><line x1="12" y1="18" x2="12" y2="18.01"/><path d="M9 9l3-3 3 3M12 6v6" stroke-width="1.8"/></svg>
+            <span>Connect Device</span>
+          </div>
+        </div>
+        <div class="sidebar-section">
+          <div class="sidebar-header">Chat</div>
+          <div class="sidebar-item" id="sidebar-chat">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 16 16"><path d="M2 3h12v8H5l-3 3V3z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/></svg>
+            <span>Messages</span>
+            <span class="chat-badge hidden" id="chat-badge">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONTENT AREA -->
+      <div class="content-area" id="content-area">
+        <!-- ICON VIEW -->
+        <div class="icon-grid" id="icon-grid"></div>
+        <!-- LIST VIEW -->
+        <div class="list-view hidden" id="list-view">
+          <div class="list-header">
+            <div class="list-col col-name">Name</div>
+            <div class="list-col col-date">Date Modified</div>
+            <div class="list-col col-size">Size</div>
+            <div class="list-col col-kind">Kind</div>
+          </div>
+          <div class="list-body" id="list-body"></div>
+        </div>
+        <!-- EMPTY STATE -->
+        <div class="empty-state hidden" id="empty-state">
+          <div class="empty-icon"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"><path d="M3 5h6l2 2h10v12H3V5z"/><path d="M3 9h18" stroke-linecap="round"/></svg></div>
+          <div class="empty-title">No files yet</div>
+          <div class="empty-text">Drag & drop files here or use the upload button</div>
+        </div>
+        <!-- DRAG OVERLAY -->
+        <div class="drag-overlay hidden" id="drag-overlay">
+          <div class="drag-content">
+            <svg width="48" height="48" viewBox="0 0 48 48"><path d="M24 8v24M16 16l8-8 8 8" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 32v6a2 2 0 002 2h28a2 2 0 002-2v-6" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/></svg>
+            <p>Drop files to upload</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHAT PANEL -->
+      <div class="chat-panel hidden" id="chat-panel">
+        <div class="chat-header">
+          <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"/></svg>Chat</span>
+          <button class="chat-close" id="chat-close">×</button>
+        </div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-bar">
+          <button class="chat-paste-btn" id="chat-paste" title="Paste from clipboard"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg></button>
+          <input type="text" class="chat-input" id="chat-input" placeholder="Type a message...">
+          <button class="chat-send-btn" id="chat-send" title="Send">
+            <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 8l12-6-4 6 4 6L2 8z" fill="currentColor"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATUS BAR -->
+    <div class="status-bar" id="status-bar">
+      <span id="status-count">0 items</span>
+      <span id="status-space"></span>
+    </div>
+
+
+    <!-- CONTEXT MENU -->
+    <div class="context-menu hidden" id="context-menu">
+      <div class="ctx-item" data-action="open">Open</div>
+      <div class="ctx-item" data-action="download">Download</div>
+      <div class="ctx-divider"></div>
+      <div class="ctx-item" data-action="upload">Upload Here</div>
+      <div class="ctx-item" data-action="new-folder">New Folder</div>
+      <div class="ctx-divider"></div>
+      <div class="ctx-item" data-action="rename">Rename</div>
+      <div class="ctx-item ctx-danger" data-action="delete">Delete</div>
+    </div>
+
+    <!-- CONFIRM DIALOG -->
+    <div class="dialog-overlay hidden" id="dialog-overlay">
+      <div class="dialog">
+        <div class="dialog-title" id="dialog-title">Confirm</div>
+        <div class="dialog-text" id="dialog-text">Are you sure?</div>
+        <div class="dialog-actions">
+          <button class="dialog-btn dialog-cancel" id="dialog-cancel">Cancel</button>
+          <button class="dialog-btn dialog-confirm" id="dialog-confirm">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRANSFER PROGRESS -->
+    <div class="progress-overlay hidden" id="progress-overlay">
+      <div class="progress-card">
+        <div class="progress-title" id="progress-title">Uploading...</div>
+        <div class="progress-list" id="progress-list"></div>
+      </div>
+    </div>
+
+    <!-- CONNECT DEVICE MODAL -->
+    <div class="connect-modal-overlay hidden" id="connect-modal-overlay">
+      <div class="connect-modal">
+        <div class="connect-modal-header">
+          <span class="connect-modal-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><rect x="5" y="2" width="14" height="20" rx="3"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>Connect Device</span>
+          <button class="connect-modal-close" id="connect-modal-close">&times;</button>
+        </div>
+        <div class="connect-modal-body">
+          <!-- QR Code -->
+          <div class="connect-qr" id="connect-qr"></div>
+          <!-- No network state -->
+          <div class="connect-no-network hidden" id="connect-no-network">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0119 12.55"/><path d="M5 12.55a10.94 10.94 0 015.17-2.39"/><path d="M10.71 5.05A16 16 0 0122.56 9"/><path d="M1.42 9a15.91 15.91 0 014.7-2.88"/><path d="M8.53 16.11a6 6 0 016.95 0"/><line x1="12" y1="20" x2="12" y2="20.01"/></svg>
+            <p>No network interfaces found</p>
+            <p class="connect-no-network-hint">Connect to WiFi or Ethernet to share with other devices.</p>
+          </div>
+          <!-- URLs -->
+          <div class="connect-section" id="connect-urls-section">
+            <div class="connect-label">Connection URL</div>
+            <div id="connect-urls"></div>
+          </div>
+          <!-- PIN -->
+          <div class="connect-section" id="connect-pin-section">
+            <div class="connect-label">PIN Code</div>
+            <div class="connect-copyable" id="connect-pin"></div>
+          </div>
+          <!-- Steps -->
+          <div class="connect-steps" id="connect-steps">
+            <div class="connect-label">How to connect</div>
+            <ol>
+              <li>Make sure your device is on the <strong>same WiFi network</strong></li>
+              <li>Scan the QR code or open the URL in your browser</li>
+              <li id="connect-tls-step" class="hidden">Tap <strong>Advanced</strong> → <strong>Proceed</strong> to accept the certificate</li>
+              <li>Enter the PIN above to connect</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- RECONNECTING BANNER -->
+    <div class="reconnect-banner hidden" id="reconnect-banner">
+      <span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;animation:spin 1s linear infinite"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-1.64-8.36L23 10"/></svg> Reconnecting...</span>
+    </div>
+  </div>
+
+  <!-- HIDDEN FILE INPUTS -->
+  <input type="file" id="file-input" multiple class="hidden-input">
+  <input type="file" id="folder-input" webkitdirectory multiple class="hidden-input">
+
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,1173 @@
+/* =====================================================
+   ConnectLAN — Client-Side Application
+   ===================================================== */
+
+(function() {
+  'use strict';
+
+  // ─── State ──────────────────────────────────────────
+  const state = {
+    authenticated: false,
+    currentPath: '',
+    history: [],
+    historyIndex: -1,
+    viewMode: 'icon', // 'icon' | 'list'
+    sortField: 'name',
+    sortDir: 'asc',
+    files: [],
+    selectedFiles: new Set(),
+    lastSelectedIndex: -1,
+    devices: [],
+    chatMessages: [],
+    chatOpen: false,
+    unreadCount: 0,
+    ws: null,
+    wsReconnectTimer: null,
+    wsReconnectDelay: 1000,
+    deviceHostname: '',
+    deviceOS: '',
+    showHidden: false,
+  };
+
+  // ─── DOM References ─────────────────────────────────
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
+
+  const dom = {
+    loginPage: $('#login-page'),
+    loginForm: $('#login-form'),
+    pinInput: $('#pin-input'),
+    loginError: $('#login-error'),
+    tlsHint: $('#tls-hint'),
+    app: $('#app'),
+    // Toolbar
+    btnBack: $('#btn-back'),
+    btnForward: $('#btn-forward'),
+    breadcrumb: $('#breadcrumb'),
+    btnIconView: $('#btn-icon-view'),
+    btnListView: $('#btn-list-view'),
+    sortSelect: $('#sort-select'),
+    btnUpload: $('#btn-upload'),
+    btnNewFolder: $('#btn-new-folder'),
+    searchInput: $('#search-input'),
+    // Sidebar
+    sidebar: $('#sidebar'),
+    sidebarHome: $('#sidebar-home'),
+    sidebarChat: $('#sidebar-chat'),
+    chatBadge: $('#chat-badge'),
+    thisDeviceName: $('#this-device-name'),
+    connectedDevices: $('#connected-devices'),
+    hamburger: $('#hamburger'),
+    // Content
+    contentArea: $('#content-area'),
+    iconGrid: $('#icon-grid'),
+    listView: $('#list-view'),
+    listBody: $('#list-body'),
+    emptyState: $('#empty-state'),
+    dragOverlay: $('#drag-overlay'),
+    // Chat
+    chatPanel: $('#chat-panel'),
+    chatMessages: $('#chat-messages'),
+    chatInput: $('#chat-input'),
+    chatSend: $('#chat-send'),
+    chatPaste: $('#chat-paste'),
+    chatClose: $('#chat-close'),
+    // Status
+    statusCount: $('#status-count'),
+    statusSpace: $('#status-space'),
+    // Overlays
+    contextMenu: $('#context-menu'),
+    dialogOverlay: $('#dialog-overlay'),
+    dialogTitle: $('#dialog-title'),
+    dialogText: $('#dialog-text'),
+    dialogCancel: $('#dialog-cancel'),
+    dialogConfirm: $('#dialog-confirm'),
+    progressOverlay: $('#progress-overlay'),
+    progressTitle: $('#progress-title'),
+    progressList: $('#progress-list'),
+    toastContainer: $('#toast-container'),
+    reconnectBanner: $('#reconnect-banner'),
+    // Connect Device
+    btnConnectDevice: $('#btn-connect-device'),
+    connectModalOverlay: $('#connect-modal-overlay'),
+    connectModalClose: $('#connect-modal-close'),
+    connectQr: $('#connect-qr'),
+    connectNoNetwork: $('#connect-no-network'),
+    connectUrlsSection: $('#connect-urls-section'),
+    connectUrls: $('#connect-urls'),
+    connectPinSection: $('#connect-pin-section'),
+    connectPin: $('#connect-pin'),
+    connectTlsStep: $('#connect-tls-step'),
+    // Hidden inputs
+    fileInput: $('#file-input'),
+    folderInput: $('#folder-input'),
+  };
+
+  // ─── Init ───────────────────────────────────────────
+  async function init() {
+    detectDevice();
+    setupEventListeners();
+    
+    if (location.protocol === 'https:') {
+      dom.tlsHint.textContent = 'If you see a security warning, click "Advanced" → "Proceed" to continue.';
+    }
+
+    // Check if already authenticated
+    try {
+      const res = await fetch('/api/info');
+      if (res.ok) {
+        const info = await res.json();
+        showApp(info);
+      }
+    } catch (e) { /* not authenticated */ }
+  }
+
+  function detectDevice() {
+    const ua = navigator.userAgent;
+    if (/Mac/.test(ua)) { state.deviceOS = 'macOS'; state.deviceHostname = 'Mac'; }
+    else if (/Linux/.test(ua)) { state.deviceOS = 'Linux'; state.deviceHostname = 'Linux Device'; }
+    else if (/Windows/.test(ua)) { state.deviceOS = 'Windows'; state.deviceHostname = 'Windows PC'; }
+    else if (/iPhone|iPad/.test(ua)) { state.deviceOS = 'iOS'; state.deviceHostname = 'iPhone'; }
+    else if (/Android/.test(ua)) { state.deviceOS = 'Android'; state.deviceHostname = 'Android Device'; }
+    else { state.deviceOS = 'Unknown'; state.deviceHostname = 'Device'; }
+  }
+
+  // ─── Auth ───────────────────────────────────────────
+  dom.loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pin = dom.pinInput.value.trim();
+    if (!pin) return;
+    
+    dom.loginError.textContent = '';
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const info = await (await fetch('/api/info')).json();
+        showApp(info);
+      } else {
+        dom.loginError.textContent = data.error || 'Invalid PIN';
+        dom.pinInput.value = '';
+        dom.pinInput.focus();
+      }
+    } catch (e) {
+      dom.loginError.textContent = 'Connection failed';
+    }
+  });
+
+  function showApp(info) {
+    state.authenticated = true;
+    dom.loginPage.classList.add('hidden');
+    dom.app.classList.remove('hidden');
+    dom.thisDeviceName.textContent = info.hostname || 'This Device';
+    dom.statusSpace.textContent = `${info.disk.free} available`;
+    
+    // Hide folder upload on iOS
+    if (/iPhone|iPad/.test(navigator.userAgent)) {
+      dom.folderInput.remove();
+    }
+    
+    connectWebSocket();
+    loadFiles('');
+  }
+
+  // ─── WebSocket ──────────────────────────────────────
+  function connectWebSocket() {
+    if (state.ws) state.ws.close();
+    
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${location.host}`);
+    state.ws = ws;
+    
+    ws.onopen = () => {
+      state.wsReconnectDelay = 1000;
+      dom.reconnectBanner.classList.add('hidden');
+      ws.send(JSON.stringify({
+        type: 'register-device',
+        hostname: state.deviceHostname,
+        os: state.deviceOS,
+        userAgent: navigator.userAgent,
+      }));
+      // Load chat history
+      loadChatHistory();
+    };
+    
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data);
+        handleWsMessage(msg);
+      } catch (err) { /* ignore */ }
+    };
+    
+    ws.onclose = () => {
+      dom.reconnectBanner.classList.remove('hidden');
+      clearTimeout(state.wsReconnectTimer);
+      state.wsReconnectTimer = setTimeout(() => {
+        state.wsReconnectDelay = Math.min(state.wsReconnectDelay * 2, 30000);
+        connectWebSocket();
+      }, state.wsReconnectDelay);
+    };
+    
+    ws.onerror = () => {};
+  }
+
+  function handleWsMessage(msg) {
+    switch (msg.type) {
+      case 'device-list':
+        state.devices = msg.devices;
+        renderDevices();
+        break;
+      case 'device-joined':
+        state.devices.push(msg.device);
+        renderDevices();
+        showToast('info', `${msg.device.hostname} connected`);
+        break;
+      case 'device-left':
+        state.devices = state.devices.filter(d => d.ip !== msg.device.ip || d.hostname !== msg.device.hostname);
+        renderDevices();
+        break;
+      case 'chat-message':
+        state.chatMessages.push(msg);
+        renderChatMessage(msg);
+        if (!state.chatOpen) {
+          state.unreadCount++;
+          dom.chatBadge.textContent = state.unreadCount;
+          dom.chatBadge.classList.remove('hidden');
+          // Desktop notification
+          if (document.hidden && Notification.permission === 'granted') {
+            new Notification(`${msg.from.hostname}`, { body: msg.text });
+          }
+        }
+        break;
+      case 'file-changed':
+        // Auto-refresh if we're viewing the affected directory
+        if (msg.path === state.currentPath || msg.path === '') {
+          loadFiles(state.currentPath);
+        }
+        break;
+      case 'upload-progress':
+        updateUploadProgress(msg);
+        break;
+    }
+  }
+
+  // ─── File Browser ───────────────────────────────────
+  async function loadFiles(filePath) {
+    try {
+      const params = new URLSearchParams({ path: filePath, showHidden: state.showHidden });
+      const res = await fetch(`/api/files?${params}`);
+      if (res.status === 401) return showLogin();
+      if (!res.ok) { showToast('error', 'Failed to load files'); return; }
+      
+      const data = await res.json();
+      state.currentPath = data.path;
+      state.files = sortFiles(data.files);
+      state.selectedFiles.clear();
+      
+      renderBreadcrumb();
+      renderFiles();
+      updateStatusBar();
+      updateNavButtons();
+    } catch (e) {
+      showToast('error', 'Connection error');
+    }
+  }
+
+  function showLogin() {
+    state.authenticated = false;
+    dom.app.classList.add('hidden');
+    dom.loginPage.classList.remove('hidden');
+  }
+
+  function navigate(filePath) {
+    // Push to history
+    if (state.historyIndex < state.history.length - 1) {
+      state.history = state.history.slice(0, state.historyIndex + 1);
+    }
+    state.history.push(filePath);
+    state.historyIndex = state.history.length - 1;
+    loadFiles(filePath);
+  }
+
+  function sortFiles(files) {
+    const f = state.sortField;
+    const d = state.sortDir === 'asc' ? 1 : -1;
+    return [...files].sort((a, b) => {
+      // Folders always first
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+      
+      if (f === 'name') return d * a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      if (f === 'date') return d * (new Date(a.modified) - new Date(b.modified));
+      if (f === 'size') return d * ((a.size || 0) - (b.size || 0));
+      if (f === 'kind') return d * a.kind.localeCompare(b.kind);
+      return 0;
+    });
+  }
+
+  function renderBreadcrumb() {
+    const parts = state.currentPath ? state.currentPath.split('/') : [];
+    let html = `<span class="breadcrumb-item" data-path="">Shared Files</span>`;
+    let cumPath = '';
+    for (const part of parts) {
+      cumPath += (cumPath ? '/' : '') + part;
+      html += `<span class="breadcrumb-sep">›</span>`;
+      html += `<span class="breadcrumb-item" data-path="${esc(cumPath)}">${esc(part)}</span>`;
+    }
+    dom.breadcrumb.innerHTML = html;
+    dom.breadcrumb.querySelectorAll('.breadcrumb-item').forEach(item => {
+      item.addEventListener('click', () => navigate(item.dataset.path));
+    });
+    
+    // Update sidebar active state
+    dom.sidebarHome.classList.toggle('active', state.currentPath === '');
+  }
+
+  function renderFiles() {
+    if (state.viewMode === 'icon') {
+      dom.iconGrid.classList.remove('hidden');
+      dom.listView.classList.add('hidden');
+      renderIconView();
+    } else {
+      dom.iconGrid.classList.add('hidden');
+      dom.listView.classList.remove('hidden');
+      renderListView();
+    }
+    
+    dom.emptyState.classList.toggle('hidden', state.files.length > 0);
+  }
+
+  function renderIconView() {
+    dom.iconGrid.innerHTML = state.files.map((f, i) => `
+      <div class="file-item ${state.selectedFiles.has(i) ? 'selected' : ''}" data-index="${i}" data-path="${esc(f.path)}" data-is-dir="${f.isDirectory}">
+        <div class="file-icon-wrap">
+          ${f.isDirectory ? renderFolderIcon() : renderFileIcon(f)}
+        </div>
+        <div class="file-name">${esc(f.name)}</div>
+        ${f.sizeFormatted ? `<div class="file-meta">${esc(f.sizeFormatted)}</div>` : ''}
+      </div>
+    `).join('');
+    
+    bindFileEvents(dom.iconGrid.querySelectorAll('.file-item'));
+    // Handle thumbnail errors via delegation (CSP-safe)
+    dom.iconGrid.querySelectorAll('img.file-thumbnail').forEach(img => {
+      img.addEventListener('error', () => img.classList.add('img-error'));
+    });
+  }
+
+  function renderListView() {
+    dom.listBody.innerHTML = state.files.map((f, i) => `
+      <div class="list-row ${state.selectedFiles.has(i) ? 'selected' : ''}" data-index="${i}" data-path="${esc(f.path)}" data-is-dir="${f.isDirectory}">
+        <div class="list-col col-name">
+          ${f.isDirectory 
+            ? '<svg class="list-icon list-folder-icon" viewBox="0 0 16 16"><path d="M1 3h5l2 2h7v8H1V3z" fill="currentColor"/></svg>'
+            : '<svg class="list-icon list-file-icon" viewBox="0 0 16 16"><path d="M3 1h6l4 4v10H3V1z" fill="currentColor" opacity="0.5"/></svg>'
+          }
+          <span>${esc(f.name)}</span>
+        </div>
+        <div class="list-col col-date">${formatDate(f.modified)}</div>
+        <div class="list-col col-size">${f.isDirectory ? '--' : esc(f.sizeFormatted)}</div>
+        <div class="list-col col-kind">${esc(f.kind)}</div>
+      </div>
+    `).join('');
+    
+    bindFileEvents(dom.listBody.querySelectorAll('.list-row'));
+  }
+
+  function renderFolderIcon() {
+    return `<div class="file-icon-folder">
+      <div class="folder-tab"></div>
+      <div class="folder-back"></div>
+      <div class="folder-front"></div>
+    </div>`;
+  }
+
+  function renderFileIcon(file) {
+    if (file.isImage) {
+      return `<img class="file-thumbnail" src="/api/thumbnail?path=${encodeURIComponent(file.path)}" alt="" loading="lazy" data-fallback="true">
+              <div class="file-icon-doc thumb-fallback"><span class="file-ext-badge">${esc(getExt(file.name))}</span></div>`;
+    }
+    const cls = file.iconType;
+    return `<div class="file-icon-doc ${cls}"><span class="file-ext-badge">${esc(getExt(file.name))}</span></div>`;
+  }
+
+  function bindFileEvents(items) {
+    items.forEach(item => {
+      item.addEventListener('click', (e) => handleFileClick(e, item));
+      item.addEventListener('dblclick', () => handleFileDoubleClick(item));
+      item.addEventListener('contextmenu', (e) => handleContextMenu(e, item));
+      
+      // Mobile long-press
+      let pressTimer;
+      item.addEventListener('touchstart', (e) => {
+        pressTimer = setTimeout(() => {
+          e.preventDefault();
+          const touch = e.touches[0];
+          handleContextMenu({ preventDefault: ()=>{}, clientX: touch.clientX, clientY: touch.clientY }, item);
+        }, 500);
+      }, { passive: false });
+      item.addEventListener('touchend', () => clearTimeout(pressTimer));
+      item.addEventListener('touchmove', () => clearTimeout(pressTimer));
+    });
+  }
+
+  // Update selection classes in-place (avoids DOM destruction that breaks dblclick in Firefox)
+  function updateSelectionUI() {
+    const selector = state.viewMode === 'icon' ? '.file-item' : '.list-row';
+    const items = dom.contentArea.querySelectorAll(selector);
+    items.forEach(item => {
+      const idx = parseInt(item.dataset.index);
+      item.classList.toggle('selected', state.selectedFiles.has(idx));
+    });
+  }
+
+  function handleFileClick(e, item) {
+    const idx = parseInt(item.dataset.index);
+    
+    if (e.metaKey || e.ctrlKey) {
+      // Toggle selection
+      if (state.selectedFiles.has(idx)) state.selectedFiles.delete(idx);
+      else state.selectedFiles.add(idx);
+    } else if (e.shiftKey && state.lastSelectedIndex >= 0) {
+      // Range selection
+      const start = Math.min(state.lastSelectedIndex, idx);
+      const end = Math.max(state.lastSelectedIndex, idx);
+      for (let i = start; i <= end; i++) state.selectedFiles.add(i);
+    } else {
+      state.selectedFiles.clear();
+      state.selectedFiles.add(idx);
+    }
+    
+    state.lastSelectedIndex = idx;
+    updateSelectionUI();
+  }
+
+  function handleFileDoubleClick(item) {
+    const filePath = item.dataset.path;
+    const isDir = item.dataset.isDir === 'true';
+    
+    if (isDir) {
+      navigate(filePath);
+    } else {
+      downloadFile(filePath);
+    }
+  }
+
+  // ─── Context Menu ───────────────────────────────────
+  let contextFile = null;
+
+  function handleContextMenu(e, item) {
+    e.preventDefault();
+    contextFile = state.files[parseInt(item.dataset.index)];
+    
+    // Select this item
+    const idx = parseInt(item.dataset.index);
+    if (!state.selectedFiles.has(idx)) {
+      state.selectedFiles.clear();
+      state.selectedFiles.add(idx);
+      renderFiles();
+    }
+    
+    showContextMenu(e.clientX, e.clientY);
+  }
+
+  function showContextMenu(x, y) {
+    dom.contextMenu.classList.remove('hidden');
+    // Position within viewport
+    const w = dom.contextMenu.offsetWidth;
+    const h = dom.contextMenu.offsetHeight;
+    if (x + w > window.innerWidth) x = window.innerWidth - w - 8;
+    if (y + h > window.innerHeight) y = window.innerHeight - h - 8;
+    dom.contextMenu.style.left = x + 'px';
+    dom.contextMenu.style.top = y + 'px';
+  }
+
+  function hideContextMenu() {
+    dom.contextMenu.classList.add('hidden');
+    contextFile = null;
+  }
+
+  dom.contextMenu.querySelectorAll('.ctx-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const action = item.dataset.action;
+      if (contextFile) {
+        switch (action) {
+          case 'open':
+            if (contextFile.isDirectory) navigate(contextFile.path);
+            else downloadFile(contextFile.path);
+            break;
+          case 'download':
+            if (contextFile.isDirectory) downloadFolder(contextFile.path);
+            else downloadFile(contextFile.path);
+            break;
+          case 'rename':
+            startRename(contextFile);
+            break;
+          case 'delete':
+            confirmDelete(contextFile);
+            break;
+        }
+      }
+      if (action === 'upload') dom.fileInput.click();
+      if (action === 'new-folder') createFolder();
+      hideContextMenu();
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!dom.contextMenu.contains(e.target)) hideContextMenu();
+  });
+
+  // Right-click on content area (no file)
+  dom.contentArea.addEventListener('contextmenu', (e) => {
+    if (e.target === dom.contentArea || e.target === dom.iconGrid || e.target === dom.emptyState) {
+      e.preventDefault();
+      contextFile = null;
+      state.selectedFiles.clear();
+      renderFiles();
+      showContextMenu(e.clientX, e.clientY);
+    }
+  });
+
+  // ─── File Operations ────────────────────────────────
+  async function downloadFile(filePath) {
+    try {
+      showToast('info', 'Starting download...');
+      const res = await fetch(`/api/download?path=${encodeURIComponent(filePath)}`);
+      if (!res.ok) { showToast('error', 'Download failed'); return; }
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filePath.split('/').pop();
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('success', 'Download complete');
+    } catch (e) {
+      showToast('error', 'Download failed');
+    }
+  }
+
+  async function downloadFolder(filePath) {
+    try {
+      showToast('info', 'Preparing ZIP download...');
+      const res = await fetch(`/api/download-folder?path=${encodeURIComponent(filePath)}`);
+      if (!res.ok) { showToast('error', 'Download failed'); return; }
+      
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filePath.split('/').pop() + '.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('success', 'Folder downloaded');
+    } catch (e) {
+      showToast('error', 'Download failed');
+    }
+  }
+
+  async function uploadFiles(files) {
+    if (!files.length) return;
+    
+    const formData = new FormData();
+    formData.append('targetPath', state.currentPath);
+    for (const file of files) {
+      formData.append('files', file);
+    }
+    
+    showProgress(`Uploading ${files.length} file(s)...`, files);
+    
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload');
+      
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          updateProgressBar(0, e.loaded, e.total);
+        }
+      };
+      
+      xhr.onload = () => {
+        hideProgress();
+        if (xhr.status === 200) {
+          showToast('success', `${files.length} file(s) uploaded`);
+          loadFiles(state.currentPath);
+        } else {
+          const data = JSON.parse(xhr.responseText);
+          showToast('error', data.error || 'Upload failed');
+        }
+      };
+      
+      xhr.onerror = () => {
+        hideProgress();
+        showToast('error', 'Upload failed');
+      };
+      
+      xhr.send(formData);
+    } catch (e) {
+      hideProgress();
+      showToast('error', 'Upload failed');
+    }
+  }
+
+  async function createFolder() {
+    const name = prompt('New folder name:', 'New Folder');
+    if (!name) return;
+    
+    try {
+      const res = await fetch('/api/mkdir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: state.currentPath, name }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('success', `Created "${data.name}"`);
+        loadFiles(state.currentPath);
+      } else {
+        showToast('error', data.error || 'Failed to create folder');
+      }
+    } catch (e) {
+      showToast('error', 'Failed to create folder');
+    }
+  }
+
+  function startRename(file) {
+    const item = dom.contentArea.querySelector(`[data-path="${CSS.escape(file.path)}"]`);
+    if (!item) return;
+    
+    const nameEl = item.querySelector('.file-name') || item.querySelector('.col-name span');
+    if (!nameEl) return;
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'file-name-input';
+    input.value = file.name;
+    nameEl.replaceWith(input);
+    input.focus();
+    
+    // Select name without extension
+    const dotIdx = file.name.lastIndexOf('.');
+    input.setSelectionRange(0, dotIdx > 0 ? dotIdx : file.name.length);
+    
+    const doRename = async () => {
+      const newName = input.value.trim();
+      if (!newName || newName === file.name) {
+        loadFiles(state.currentPath);
+        return;
+      }
+      try {
+        const res = await fetch('/api/rename', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: file.path, newName }),
+        });
+        if (res.ok) {
+          showToast('success', `Renamed to "${newName}"`);
+        } else {
+          const data = await res.json();
+          showToast('error', data.error || 'Rename failed');
+        }
+      } catch (e) {
+        showToast('error', 'Rename failed');
+      }
+      loadFiles(state.currentPath);
+    };
+    
+    input.addEventListener('blur', doRename);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      if (e.key === 'Escape') { loadFiles(state.currentPath); }
+    });
+  }
+
+  function confirmDelete(file) {
+    dom.dialogTitle.textContent = 'Delete';
+    dom.dialogText.textContent = `Are you sure you want to delete "${file.name}"? This cannot be undone.`;
+    dom.dialogOverlay.classList.remove('hidden');
+    
+    const handler = async () => {
+      dom.dialogOverlay.classList.add('hidden');
+      dom.dialogConfirm.removeEventListener('click', handler);
+      try {
+        const res = await fetch('/api/delete', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: file.path }),
+        });
+        if (res.ok) {
+          showToast('success', `Deleted "${file.name}"`);
+          loadFiles(state.currentPath);
+        } else {
+          const data = await res.json();
+          showToast('error', data.error || 'Delete failed');
+        }
+      } catch (e) {
+        showToast('error', 'Delete failed');
+      }
+    };
+    
+    dom.dialogConfirm.addEventListener('click', handler);
+    dom.dialogCancel.onclick = () => {
+      dom.dialogOverlay.classList.add('hidden');
+      dom.dialogConfirm.removeEventListener('click', handler);
+    };
+  }
+
+  // ─── Drag & Drop ────────────────────────────────────
+  let dragCounter = 0;
+  dom.contentArea.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dragCounter++;
+    dom.dragOverlay.classList.remove('hidden');
+  });
+  dom.contentArea.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dragCounter--;
+    if (dragCounter <= 0) { dom.dragOverlay.classList.add('hidden'); dragCounter = 0; }
+  });
+  dom.contentArea.addEventListener('dragover', (e) => e.preventDefault());
+  dom.contentArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragCounter = 0;
+    dom.dragOverlay.classList.add('hidden');
+    if (e.dataTransfer.files.length) {
+      uploadFiles(Array.from(e.dataTransfer.files));
+    }
+  });
+
+  // ─── Upload Buttons ─────────────────────────────────
+  dom.btnUpload.addEventListener('click', () => dom.fileInput.click());
+  dom.fileInput.addEventListener('change', () => {
+    if (dom.fileInput.files.length) {
+      uploadFiles(Array.from(dom.fileInput.files));
+      dom.fileInput.value = '';
+    }
+  });
+  dom.btnNewFolder.addEventListener('click', createFolder);
+
+  // ─── Navigation ─────────────────────────────────────
+  dom.btnBack.addEventListener('click', () => {
+    if (state.historyIndex > 0) {
+      state.historyIndex--;
+      loadFiles(state.history[state.historyIndex]);
+    }
+  });
+  dom.btnForward.addEventListener('click', () => {
+    if (state.historyIndex < state.history.length - 1) {
+      state.historyIndex++;
+      loadFiles(state.history[state.historyIndex]);
+    }
+  });
+  dom.sidebarHome.addEventListener('click', () => navigate(''));
+
+  function updateNavButtons() {
+    dom.btnBack.disabled = state.historyIndex <= 0;
+    dom.btnForward.disabled = state.historyIndex >= state.history.length - 1;
+  }
+
+  // ─── View Modes ─────────────────────────────────────
+  dom.btnIconView.addEventListener('click', () => setViewMode('icon'));
+  dom.btnListView.addEventListener('click', () => setViewMode('list'));
+
+  function setViewMode(mode) {
+    state.viewMode = mode;
+    dom.btnIconView.classList.toggle('active', mode === 'icon');
+    dom.btnListView.classList.toggle('active', mode === 'list');
+    renderFiles();
+  }
+
+  // ─── Sorting ────────────────────────────────────────
+  dom.sortSelect.addEventListener('change', () => {
+    const val = dom.sortSelect.value;
+    const [field, dir] = val.split('-');
+    state.sortField = field;
+    state.sortDir = dir;
+    state.files = sortFiles(state.files);
+    renderFiles();
+  });
+
+  // ─── Search ─────────────────────────────────────────
+  let searchTimeout;
+  dom.searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      const q = dom.searchInput.value.trim();
+      if (q) {
+        searchFiles(q);
+      } else {
+        loadFiles(state.currentPath);
+      }
+    }, 300);
+  });
+
+  async function searchFiles(query) {
+    try {
+      const res = await fetch(`/api/search?path=${encodeURIComponent(state.currentPath)}&q=${encodeURIComponent(query)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      state.files = data.results;
+      state.selectedFiles.clear();
+      renderFiles();
+      dom.statusCount.textContent = `${state.files.length} result${state.files.length !== 1 ? 's' : ''}`;
+    } catch (e) { /* ignore */ }
+  }
+
+  // ─── Chat ───────────────────────────────────────────
+  dom.sidebarChat.addEventListener('click', toggleChat);
+  dom.chatClose.addEventListener('click', toggleChat);
+
+  function toggleChat() {
+    state.chatOpen = !state.chatOpen;
+    dom.chatPanel.classList.toggle('hidden', !state.chatOpen);
+    if (state.chatOpen) {
+      state.unreadCount = 0;
+      dom.chatBadge.classList.add('hidden');
+      dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+      dom.chatInput.focus();
+      // Request notification permission
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
+  }
+
+  async function loadChatHistory() {
+    try {
+      const res = await fetch('/api/chat/history');
+      if (!res.ok) return;
+      const data = await res.json();
+      state.chatMessages = data.messages || [];
+      state.devices = data.devices || [];
+      
+      dom.chatMessages.innerHTML = '';
+      state.chatMessages.forEach(msg => renderChatMessage(msg));
+      renderDevices();
+    } catch (e) { /* ignore */ }
+  }
+
+  function renderChatMessage(msg) {
+    const isSelf = msg.from.hostname === state.deviceHostname && msg.from.os === state.deviceOS;
+    const msgEl = document.createElement('div');
+    msgEl.className = `chat-msg ${isSelf ? 'self' : ''}`;
+    msgEl.innerHTML = `
+      ${!isSelf ? `<div class="chat-msg-sender">${getDeviceIcon(msg.from.os)} ${msg.from.hostname}</div>` : ''}
+      <div class="chat-msg-bubble">${formatChatText(msg.text)}</div>
+      <div class="chat-msg-time">${formatTime(msg.timestamp)}</div>
+    `;
+    
+    // Click to copy
+    msgEl.querySelector('.chat-msg-bubble').addEventListener('click', () => {
+      navigator.clipboard.writeText(msg.text).then(() => {
+        showToast('success', 'Copied to clipboard');
+      });
+    });
+    
+    dom.chatMessages.appendChild(msgEl);
+    dom.chatMessages.scrollTop = dom.chatMessages.scrollHeight;
+  }
+
+  function sendChatMessage() {
+    const text = dom.chatInput.value.trim();
+    if (!text || !state.ws || state.ws.readyState !== 1) return;
+    
+    state.ws.send(JSON.stringify({ type: 'chat-message', text }));
+    dom.chatInput.value = '';
+  }
+
+  dom.chatSend.addEventListener('click', sendChatMessage);
+  dom.chatInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  });
+
+  dom.chatPaste.addEventListener('click', async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        dom.chatInput.value = text;
+        sendChatMessage();
+      }
+    } catch (e) {
+      showToast('info', 'Clipboard access denied');
+    }
+  });
+
+  // ─── Connect Device ─────────────────────────────────
+  dom.btnConnectDevice.addEventListener('click', openConnectModal);
+  dom.connectModalClose.addEventListener('click', closeConnectModal);
+  dom.connectModalOverlay.addEventListener('click', (e) => {
+    if (e.target === dom.connectModalOverlay) closeConnectModal();
+  });
+
+  async function openConnectModal() {
+    try {
+      const res = await fetch('/api/connect-info');
+      if (!res.ok) { showToast('error', 'Failed to load connection info'); return; }
+      const data = await res.json();
+
+      if (!data.urls || data.urls.length === 0) {
+        // No network
+        dom.connectQr.classList.add('hidden');
+        dom.connectUrlsSection.classList.add('hidden');
+        dom.connectPinSection.classList.add('hidden');
+        dom.connectNoNetwork.classList.remove('hidden');
+      } else {
+        dom.connectNoNetwork.classList.add('hidden');
+        dom.connectQr.classList.remove('hidden');
+        dom.connectUrlsSection.classList.remove('hidden');
+        dom.connectPinSection.classList.remove('hidden');
+
+        // QR code
+        if (data.qrSvg) {
+          dom.connectQr.innerHTML = data.qrSvg;
+        }
+
+        // URLs
+        const copyIcon = '<svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>';
+        dom.connectUrls.innerHTML = data.urls.map(url =>
+          `<div class="connect-copyable" data-copy="${esc(url)}"><span>${esc(url)}</span>${copyIcon}</div>`
+        ).join('');
+
+        // PIN
+        dom.connectPin.innerHTML = `<span class="connect-pin-value">${esc(data.pin)}</span>${copyIcon}`;
+        dom.connectPin.dataset.copy = data.pin;
+
+        // TLS step
+        dom.connectTlsStep.classList.toggle('hidden', data.noTls);
+      }
+
+      // Bind copy handlers
+      dom.connectModalOverlay.querySelectorAll('.connect-copyable').forEach(el => {
+        el.addEventListener('click', () => {
+          const text = el.dataset.copy;
+          if (text) {
+            navigator.clipboard.writeText(text).then(() => showToast('success', 'Copied to clipboard'));
+          }
+        });
+      });
+
+      dom.connectModalOverlay.classList.remove('hidden');
+    } catch (e) {
+      showToast('error', 'Failed to load connection info');
+    }
+  }
+
+  function closeConnectModal() {
+    dom.connectModalOverlay.classList.add('hidden');
+  }
+
+  // ─── Devices ────────────────────────────────────────
+  function renderDevices() {
+    dom.connectedDevices.innerHTML = state.devices.map(d => `
+      <div class="sidebar-item">
+        <span class="sidebar-icon">${getDeviceIcon(d.os)}</span>
+        <span>${d.hostname}</span>
+      </div>
+    `).join('');
+  }
+
+  function getDeviceIcon(osStr) {
+    const os = (osStr || '').toLowerCase();
+    const s = (d) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px">${d}</svg>`;
+    if (os.includes('mac') || os.includes('darwin')) return s('<path d="M12 2C9.24 2 8 4.09 8 6c0 1.38.56 2.63 1.46 3.54C8.56 10.37 8 11.62 8 13c0 2.76 1.79 5 4 5s4-2.24 4-5c0-1.38-.56-2.63-1.46-3.54C15.44 8.63 16 7.38 16 6c0-1.91-1.24-4-4-4z" fill="currentColor" stroke="none"/>');
+    if (os.includes('linux')) return s('<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>');
+    if (os.includes('windows')) return s('<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/>');
+    if (os.includes('ios') || os.includes('iphone')) return s('<rect x="5" y="2" width="14" height="20" rx="3"/><line x1="12" y1="18" x2="12" y2="18.01"/>');
+    if (os.includes('android')) return s('<rect x="5" y="2" width="14" height="20" rx="3"/><line x1="12" y1="18" x2="12" y2="18.01"/>');
+    return s('<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>');
+  }
+
+  // ─── Progress ───────────────────────────────────────
+  function showProgress(title, files) {
+    dom.progressTitle.textContent = title;
+    dom.progressList.innerHTML = `
+      <div class="progress-item">
+        <div class="progress-item-name">${files.length > 1 ? `${files.length} files` : esc(files[0].name)}</div>
+        <div class="progress-bar"><div class="progress-bar-fill" id="progress-fill-0" style="width:0%"></div></div>
+        <div class="progress-info" id="progress-info-0">Preparing...</div>
+      </div>
+    `;
+    dom.progressOverlay.classList.remove('hidden');
+  }
+
+  function updateProgressBar(index, loaded, total) {
+    const fill = $(`#progress-fill-${index}`);
+    const info = $(`#progress-info-${index}`);
+    if (!fill) return;
+    
+    const pct = total ? Math.round((loaded / total) * 100) : 0;
+    fill.style.width = pct + '%';
+    if (info) {
+      const mb = (loaded / (1024 * 1024)).toFixed(1);
+      const totalMb = (total / (1024 * 1024)).toFixed(1);
+      info.textContent = `${mb} MB / ${totalMb} MB — ${pct}%`;
+    }
+  }
+
+  function updateUploadProgress(msg) {
+    // Progress from WebSocket
+    updateProgressBar(0, msg.loaded, msg.total);
+  }
+
+  function hideProgress() {
+    dom.progressOverlay.classList.add('hidden');
+  }
+
+  // ─── Toast Notifications ────────────────────────────
+  function showToast(type, message) {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    dom.toastContainer.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.classList.add('toast-exit');
+      setTimeout(() => toast.remove(), 250);
+    }, 4000);
+  }
+
+  // ─── Status Bar ─────────────────────────────────────
+  function updateStatusBar() {
+    const count = state.files.length;
+    dom.statusCount.textContent = `${count} item${count !== 1 ? 's' : ''}`;
+  }
+
+  // ─── Hamburger (Mobile) ─────────────────────────────
+  const sidebarBackdrop = $('#sidebar-backdrop');
+  
+  function toggleSidebar(forceClose) {
+    const isOpen = forceClose ? true : dom.sidebar.classList.contains('open');
+    dom.sidebar.classList.toggle('open', !isOpen);
+    if (sidebarBackdrop) sidebarBackdrop.classList.toggle('active', !isOpen);
+  }
+  
+  dom.hamburger.addEventListener('click', () => toggleSidebar());
+  if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', () => toggleSidebar(true));
+  
+  // Close sidebar on item click (mobile)
+  dom.sidebar.addEventListener('click', (e) => {
+    if (e.target.closest('.sidebar-item') && window.innerWidth <= 768) {
+      toggleSidebar(true);
+    }
+  });
+
+  // ─── Keyboard Shortcuts ─────────────────────────────
+  document.addEventListener('keydown', (e) => {
+    if (!state.authenticated) return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    
+    // Delete key
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (state.selectedFiles.size === 1) {
+        const idx = [...state.selectedFiles][0];
+        confirmDelete(state.files[idx]);
+      }
+    }
+    // Enter to rename
+    if (e.key === 'Enter' && state.selectedFiles.size === 1) {
+      const idx = [...state.selectedFiles][0];
+      startRename(state.files[idx]);
+    }
+    // Cmd+A / Ctrl+A to select all
+    if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+      e.preventDefault();
+      state.files.forEach((_, i) => state.selectedFiles.add(i));
+      renderFiles();
+    }
+    // Escape to deselect
+    if (e.key === 'Escape') {
+      if (!dom.connectModalOverlay.classList.contains('hidden')) {
+        closeConnectModal();
+        return;
+      }
+      state.selectedFiles.clear();
+      renderFiles();
+      hideContextMenu();
+    }
+  });
+
+  // ─── Helpers ────────────────────────────────────────
+  function esc(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function getExt(name) {
+    const dot = name.lastIndexOf('.');
+    return dot > 0 ? name.slice(dot + 1).toUpperCase() : '';
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+  }
+
+  function formatTime(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function formatChatText(text) {
+    // Detect code blocks
+    if (text.includes('```')) {
+      return text.replace(/```([\s\S]*?)```/g, '<pre style="background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;font-size:12px;overflow-x:auto;margin:4px 0">$1</pre>');
+    }
+    return text;
+  }
+
+  function setupEventListeners() {
+    // Click outside to deselect
+    dom.contentArea.addEventListener('click', (e) => {
+      if (e.target === dom.contentArea || e.target === dom.iconGrid) {
+        state.selectedFiles.clear();
+        renderFiles();
+      }
+    });
+    
+    // Window resize — close sidebar on desktop
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 768) {
+        dom.sidebar.classList.remove('open');
+      }
+    });
+
+    // iOS keyboard — keep chat input visible using visualViewport API
+    if (window.visualViewport && window.innerWidth <= 768) {
+      window.visualViewport.addEventListener('resize', () => {
+        const vv = window.visualViewport;
+        const keyboardHeight = window.innerHeight - vv.height;
+        if (dom.chatPanel && !dom.chatPanel.classList.contains('hidden')) {
+          dom.chatPanel.style.bottom = keyboardHeight + 'px';
+        }
+      });
+      window.visualViewport.addEventListener('scroll', () => {
+        // Prevent iOS visual viewport scroll offset from shifting content
+        if (dom.chatPanel && !dom.chatPanel.classList.contains('hidden')) {
+          dom.chatPanel.style.top = window.visualViewport.offsetTop + 'px';
+        }
+      });
+    }
+  }
+
+  // ─── Start ──────────────────────────────────────────
+  init();
+})();
