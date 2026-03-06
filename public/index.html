@@ -44,6 +44,17 @@
   <!-- MAIN APP -->
   <div id="app" class="app hidden">
     <!-- TOOLBAR -->
+    <!-- Update progress banner (Electron only) -->
+    <div id="update-banner" class="update-banner" style="display:none;">
+      <div class="update-banner-content">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span id="update-banner-text">Downloading update…</span>
+      </div>
+      <div class="update-banner-bar">
+        <div class="update-banner-fill" id="update-banner-fill"></div>
+      </div>
+    </div>
+
     <div class="toolbar" id="toolbar">
       <div class="toolbar-left">
         <button class="hamburger" id="hamburger"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>

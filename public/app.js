@@ -137,6 +137,36 @@
   // ─── Electron Detection ─────────────────────────────
   const isElectron = !!(window.electronAPI);
 
+  // ─── Electron Auto-Update Progress ─────────────────
+  if (isElectron && window.electronAPI.onUpdateAvailable) {
+    const banner = document.getElementById('update-banner');
+    const bannerText = document.getElementById('update-banner-text');
+    const bannerFill = document.getElementById('update-banner-fill');
+    const fmtSpeed = (bps) => {
+      if (bps > 1048576) return (bps / 1048576).toFixed(1) + ' MB/s';
+      if (bps > 1024) return (bps / 1024).toFixed(0) + ' KB/s';
+      return bps + ' B/s';
+    };
+    window.electronAPI.onUpdateAvailable((data) => {
+      if (banner) {
+        banner.style.display = '';
+        bannerText.textContent = `Downloading v${data.version}…`;
+      }
+    });
+    window.electronAPI.onUpdateProgress((data) => {
+      if (bannerFill) bannerFill.style.width = data.percent + '%';
+      if (bannerText) bannerText.textContent = `Downloading update… ${data.percent}% (${fmtSpeed(data.bytesPerSecond)})`;
+    });
+    window.electronAPI.onUpdateDownloaded((data) => {
+      if (bannerFill) bannerFill.style.width = '100%';
+      if (bannerText) bannerText.textContent = `v${data.version} ready — restart to apply`;
+      if (bannerFill) bannerFill.style.background = '#22c55e';
+    });
+    window.electronAPI.onUpdateError(() => {
+      if (banner) banner.style.display = 'none';
+    });
+  }
+
   // ─── Init ───────────────────────────────────────────
   async function init() {
     detectDevice();

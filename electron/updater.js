@@ -13,13 +13,9 @@ function initAutoUpdater(win) {
 
   autoUpdater.on('update-available', (info) => {
     console.log(`[updater] Update available: v${info.version}`);
-    if (isManualCheck && mainWindow) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Update Available',
-        message: `A new version (v${info.version}) is available and is being downloaded.`,
-        buttons: ['OK'],
-      });
+    // Send to renderer for in-app progress UI
+    if (mainWindow) {
+      mainWindow.webContents.send('update-available', { version: info.version });
     }
   });
 
@@ -37,12 +33,27 @@ function initAutoUpdater(win) {
   });
 
   autoUpdater.on('download-progress', (progress) => {
-    console.log(`[updater] Download: ${Math.round(progress.percent)}%`);
+    const pct = Math.round(progress.percent);
+    console.log(`[updater] Download: ${pct}%`);
+    // Dock/taskbar progress bar
+    if (mainWindow) {
+      mainWindow.setProgressBar(progress.percent / 100);
+      mainWindow.webContents.send('update-download-progress', {
+        percent: pct,
+        bytesPerSecond: progress.bytesPerSecond,
+        transferred: progress.transferred,
+        total: progress.total,
+      });
+    }
   });
 
   autoUpdater.on('update-downloaded', (info) => {
     console.log(`[updater] Update downloaded: v${info.version}`);
     if (mainWindow) {
+      // Clear dock/taskbar progress
+      mainWindow.setProgressBar(-1);
+      mainWindow.webContents.send('update-downloaded', { version: info.version });
+
       dialog.showMessageBox(mainWindow, {
         type: 'info',
         title: 'Update Ready',
@@ -59,6 +70,10 @@ function initAutoUpdater(win) {
 
   autoUpdater.on('error', (err) => {
     console.error('[updater] Error:', err.message);
+    if (mainWindow) {
+      mainWindow.setProgressBar(-1);
+      mainWindow.webContents.send('update-error', { message: err.message });
+    }
     if (isManualCheck && mainWindow) {
       dialog.showMessageBox(mainWindow, {
         type: 'error',
