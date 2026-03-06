@@ -2,6 +2,17 @@
 
 All notable changes to NearDrop will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- In-app update download progress banner with percentage and speed (Electron only)
+- Dock/taskbar progress bar during update downloads
+- Release script (`release.sh`) and remove-release script (`remove-release.sh`)
+- Linux builds now include both x64 and arm64 architectures
+
+### Changed
+- Build artifacts now output into versioned folders (`dist-electron/v1.x.x/`)
+
 ## [1.0.1] - 2026-03-06
 
 ### Security
