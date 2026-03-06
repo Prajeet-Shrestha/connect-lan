@@ -90,6 +90,10 @@
     ],
     "outputPath": "dist"
   },
+  "author": {
+    "name": "Prajeet Shrestha",
+    "email": "prazzeettstha@gmail.com"
+  },
   "keywords": [
     "lan",
     "file-transfer",
