@@ -1,6 +1,6 @@
 {
   "name": "neardrop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Finder-inspired LAN file transfer application",
   "main": "electron/main.js",
   "bin": "server.js",
@@ -57,7 +57,10 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "icon": "build/icon.ico"
@@ -66,11 +69,17 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "artifactName": "${productName}-${version}-${arch}.${ext}",
