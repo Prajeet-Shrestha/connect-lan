@@ -195,6 +195,23 @@ install_linux() {
     local install_dir="/usr/local/bin"
     local install_path="${install_dir}/neardrop"
 
+    # AppImages require FUSE 2
+    if ! ldconfig -p 2>/dev/null | grep -q libfuse.so.2; then
+        ui_warn "libfuse2 not found (required for AppImages)"
+        if command -v apt &>/dev/null; then
+            ui_info "Installing libfuse2..."
+            sudo apt install -y libfuse2 2>/dev/null || {
+                ui_error "Failed to install libfuse2"
+                ui_info "Install manually: sudo apt install libfuse2"
+            }
+        else
+            ui_info "Install libfuse2 for your distro, e.g.:"
+            ui_info "  Ubuntu/Debian:  sudo apt install libfuse2"
+            ui_info "  Fedora:         sudo dnf install fuse-libs"
+            ui_info "  Arch:           sudo pacman -S fuse2"
+        fi
+    fi
+
     chmod +x "$DOWNLOAD_PATH"
 
     if [[ -w "$install_dir" ]]; then
