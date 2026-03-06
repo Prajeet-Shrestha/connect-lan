@@ -154,16 +154,22 @@ install_mac() {
     ui_info "Mounting DMG..."
 
     local mount_output mount_point
-    mount_output=$(hdiutil attach "$DOWNLOAD_PATH" -nobrowse -quiet 2>&1)
-    mount_point=$(echo "$mount_output" | grep "/Volumes" | tail -1 | sed 's/.*\t//')
+    mount_output=$(hdiutil attach "$DOWNLOAD_PATH" -nobrowse 2>&1) || {
+        ui_error "Failed to mount DMG"
+        ui_info  "$mount_output"
+        ui_info  "Try opening the DMG manually: open \"$DOWNLOAD_PATH\""
+        exit 1
+    }
+    mount_point=$(echo "$mount_output" | grep "/Volumes" | tail -1 | sed 's/.*	//' || true)
 
     if [[ -z "$mount_point" ]]; then
-        ui_error "Failed to mount DMG"
+        ui_error "Could not find mount point"
+        ui_info  "Try opening the DMG manually: open \"$DOWNLOAD_PATH\""
         exit 1
     fi
 
     local app_path
-    app_path=$(find "$mount_point" -maxdepth 1 -name "*.app" | head -1)
+    app_path=$(find "$mount_point" -maxdepth 1 -name "*.app" | head -1 || true)
     if [[ -z "$app_path" ]]; then
         ui_error "No .app found in DMG"
         hdiutil detach "$mount_point" -quiet 2>/dev/null || true
