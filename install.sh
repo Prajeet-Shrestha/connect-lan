@@ -118,11 +118,11 @@ fetch_version() {
 
 # ─── Download Asset ──────────────────────────────────
 download_asset() {
-    # Determine asset name
+    # Determine asset name (includes arch label to match release filenames)
     if [[ "$PLATFORM" == "mac" ]]; then
-        ASSET_NAME="${APP_NAME}-${VERSION}.dmg"
+        ASSET_NAME="${APP_NAME}-${VERSION}-${ARCH_LABEL}.dmg"
     else
-        ASSET_NAME="${APP_NAME}-${VERSION}.AppImage"
+        ASSET_NAME="${APP_NAME}-${VERSION}-${ARCH_LABEL}.AppImage"
     fi
 
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ASSET_NAME}"
