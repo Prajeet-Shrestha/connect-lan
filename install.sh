@@ -73,7 +73,7 @@ detect_platform() {
 
     case "$ARCH" in
         arm64|aarch64) ARCH_LABEL="arm64" ;;
-        x86_64|amd64)  ARCH_LABEL="x86_64" ;;
+        x86_64|amd64)  ARCH_LABEL="amd64" ;;
         *)
             ui_error "Unsupported architecture: ${ARCH}"
             exit 1
@@ -118,11 +118,24 @@ fetch_version() {
 
 # ─── Download Asset ──────────────────────────────────
 download_asset() {
-    # Determine asset name (includes arch label to match release filenames)
+    local ext="${1:-}"   # optional override extension
+
+    # Determine asset name
     if [[ "$PLATFORM" == "mac" ]]; then
         ASSET_NAME="${APP_NAME}-${VERSION}-${ARCH_LABEL}.dmg"
-    else
-        ASSET_NAME="${APP_NAME}-${VERSION}-${ARCH_LABEL}.AppImage"
+    elif [[ -n "$ext" ]]; then
+        # Use the provided extension (.deb or .AppImage)
+        if [[ "$ext" == "deb" ]]; then
+            # .deb uses amd64 for x86_64
+            local deb_arch="$ARCH_LABEL"
+            [[ "$ARCH_LABEL" == "x86_64" ]] && deb_arch="amd64"
+            ASSET_NAME="${APP_NAME}-${VERSION}-${deb_arch}.${ext}"
+        else
+            # .AppImage uses x86_64
+            local appimage_arch="$ARCH_LABEL"
+            [[ "$ARCH_LABEL" == "amd64" ]] && appimage_arch="x86_64"
+            ASSET_NAME="${APP_NAME}-${VERSION}-${appimage_arch}.${ext}"
+        fi
     fi
 
     DOWNLOAD_URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ASSET_NAME}"
@@ -138,15 +151,13 @@ download_asset() {
         -w "%{http_code}" -o "$DOWNLOAD_PATH" "$DOWNLOAD_URL")
 
     if [[ "$http_code" != "200" ]]; then
-        ui_error "Download failed (HTTP ${http_code})"
-        ui_info  "URL: ${DOWNLOAD_URL}"
-        ui_info  "Download manually: https://github.com/${REPO}/releases/latest"
-        exit 1
+        return 1
     fi
 
     local size
     size=$(du -h "$DOWNLOAD_PATH" | cut -f1 | xargs)
     ui_success "Downloaded ${ASSET_NAME} (${size})"
+    return 0
 }
 
 # ─── Install (macOS) ────────────────────────────────
@@ -191,19 +202,30 @@ install_mac() {
 }
 
 # ─── Install (Linux) ────────────────────────────────
-install_linux() {
-    local install_dir="/usr/local/bin"
-    local install_path="${install_dir}/neardrop"
+install_linux_deb() {
+    ui_info "Installing .deb package..."
+    sudo dpkg -i "$DOWNLOAD_PATH" 2>/dev/null || {
+        ui_info "Fixing missing dependencies..."
+        sudo apt-get install -f -y 2>/dev/null || true
+        sudo dpkg -i "$DOWNLOAD_PATH" || return 1
+    }
+
+    ui_success "Installed → /opt/NearDrop/neardrop"
+    ui_info "Binary symlinked to /usr/bin/neardrop"
+    return 0
+}
+
+install_linux_appimage() {
+    local app_dir="/opt/neardrop"
+    local app_path="${app_dir}/neardrop.AppImage"
+    local bin_path="/usr/local/bin/neardrop"
 
     # AppImages require FUSE 2
     if ! ldconfig -p 2>/dev/null | grep -q libfuse.so.2; then
         ui_warn "libfuse2 not found (required for AppImages)"
         if command -v apt &>/dev/null; then
             ui_info "Installing libfuse2..."
-            sudo apt install -y libfuse2 2>/dev/null || {
-                ui_error "Failed to install libfuse2"
-                ui_info "Install manually: sudo apt install libfuse2"
-            }
+            sudo apt install -y libfuse2 2>/dev/null || true
         else
             ui_info "Install libfuse2 for your distro, e.g.:"
             ui_info "  Ubuntu/Debian:  sudo apt install libfuse2"
@@ -214,14 +236,41 @@ install_linux() {
 
     chmod +x "$DOWNLOAD_PATH"
 
-    if [[ -w "$install_dir" ]]; then
-        mv "$DOWNLOAD_PATH" "$install_path"
+    sudo mkdir -p "$app_dir"
+    sudo mv "$DOWNLOAD_PATH" "$app_path"
+    sudo chmod +x "$app_path"
+
+    # Wrapper script passes --no-sandbox to avoid SUID sandbox crash
+    sudo tee "$bin_path" > /dev/null << 'WRAPPER'
+#!/bin/bash
+exec /opt/neardrop/neardrop.AppImage --no-sandbox "$@"
+WRAPPER
+    sudo chmod +x "$bin_path"
+
+    ui_success "Installed → ${bin_path}"
+    return 0
+}
+
+install_linux() {
+    # Try .deb first (Debian/Ubuntu)
+    if command -v dpkg &>/dev/null; then
+        ui_info "dpkg found — trying .deb package first..."
+        if download_asset "deb" && install_linux_deb; then
+            return 0
+        fi
+        ui_warn ".deb install failed — falling back to AppImage..."
     else
-        ui_info "Root access required for ${install_dir}"
-        sudo mv "$DOWNLOAD_PATH" "$install_path"
+        ui_info "dpkg not found — using AppImage..."
     fi
 
-    ui_success "Installed → ${install_path}"
+    # Fallback to AppImage
+    if download_asset "AppImage"; then
+        install_linux_appimage
+    else
+        ui_error "Download failed"
+        ui_info  "Download manually: https://github.com/${REPO}/releases/latest"
+        exit 1
+    fi
 }
 
 # ─── Main ────────────────────────────────────────────
@@ -233,16 +282,16 @@ main() {
     ui_stage "Detecting platform"
     detect_platform
 
-    # Stage 2: Download
+    # Stage 2: Download & Install
     ui_stage "Downloading latest release"
     fetch_version
-    download_asset
 
-    # Stage 3: Install
-    ui_stage "Installing"
     if [[ "$PLATFORM" == "mac" ]]; then
+        download_asset
+        ui_stage "Installing"
         install_mac
     else
+        ui_stage "Installing"
         install_linux
     fi
 
