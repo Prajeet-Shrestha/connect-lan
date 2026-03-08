@@ -152,6 +152,7 @@
     // Hidden inputs
     fileInput: $('#file-input'),
     folderInput: $('#folder-input'),
+    selectRect: $('#select-rect'),
   };
 
   // ─── Electron Detection ─────────────────────────────
@@ -735,8 +736,13 @@
             else downloadFile(contextFile.path);
             break;
           case 'download':
-            if (contextFile.isDirectory) downloadFolder(contextFile.path);
-            else downloadFile(contextFile.path);
+            if (state.selectedFiles.size > 1) {
+              downloadSelected();
+            } else if (contextFile.isDirectory) {
+              downloadFolder(contextFile.path);
+            } else {
+              downloadFile(contextFile.path);
+            }
             break;
           case 'rename':
             startRename(contextFile);
@@ -782,6 +788,15 @@
     const key = filePath + '::zip';
     if (activeDownloads.has(key)) return;
     await streamDownload(key, `/api/download-folder?path=${encodeURIComponent(filePath)}`, filePath.split('/').pop() + '.zip');
+  }
+
+  function downloadSelected() {
+    for (const idx of state.selectedFiles) {
+      const file = state.files[idx];
+      if (!file) continue;
+      if (file.isDirectory) downloadFolder(file.path);
+      else downloadFile(file.path);
+    }
   }
 
   async function streamDownload(downloadKey, url, filename) {
@@ -1719,6 +1734,11 @@
       state.files.forEach((_, i) => state.selectedFiles.add(i));
       renderFiles();
     }
+    // Cmd+D / Ctrl+D to download selected
+    if ((e.metaKey || e.ctrlKey) && e.key === 'd' && state.selectedFiles.size > 0) {
+      e.preventDefault();
+      downloadSelected();
+    }
     // Escape to deselect
     if (e.key === 'Escape') {
       if (!dom.settingsModalOverlay.classList.contains('hidden')) {
@@ -1784,12 +1804,96 @@
   }
 
   function setupEventListeners() {
-    // Click outside to deselect
+    // Click outside to deselect (suppressed after drag-select)
     dom.contentArea.addEventListener('click', (e) => {
+      if (dragSelect.didDrag) { dragSelect.didDrag = false; return; }
       if (e.target === dom.contentArea || e.target === dom.iconGrid) {
         state.selectedFiles.clear();
         renderFiles();
       }
+    });
+
+    // ─── Drag-Select Rectangle ──────────────────────────
+    let dragSelect = { active: false, startX: 0, startY: 0, didDrag: false };
+
+    dom.contentArea.addEventListener('mousedown', (e) => {
+      // Only start drag-select on left click, on the content background
+      if (e.button !== 0) return;
+      const target = e.target;
+      if (target.closest('.file-item') || target.closest('.list-row')) return;
+      if (target.closest('.drag-overlay') || target.closest('.empty-state')) return;
+      if (!target.closest('.content-area')) return;
+
+      const rect = dom.contentArea.getBoundingClientRect();
+      dragSelect.active = true;
+      dragSelect.startX = e.clientX - rect.left + dom.contentArea.scrollLeft;
+      dragSelect.startY = e.clientY - rect.top + dom.contentArea.scrollTop;
+
+      if (!e.metaKey && !e.ctrlKey) {
+        state.selectedFiles.clear();
+        renderFiles();
+      }
+
+      dom.selectRect.style.left = dragSelect.startX + 'px';
+      dom.selectRect.style.top = dragSelect.startY + 'px';
+      dom.selectRect.style.width = '0px';
+      dom.selectRect.style.height = '0px';
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!dragSelect.active) return;
+
+      const rect = dom.contentArea.getBoundingClientRect();
+      const curX = e.clientX - rect.left + dom.contentArea.scrollLeft;
+      const curY = e.clientY - rect.top + dom.contentArea.scrollTop;
+
+      const x = Math.min(dragSelect.startX, curX);
+      const y = Math.min(dragSelect.startY, curY);
+      const w = Math.abs(curX - dragSelect.startX);
+      const h = Math.abs(curY - dragSelect.startY);
+
+      if (w > 4 || h > 4) {
+        dom.selectRect.classList.remove('hidden');
+        dragSelect.didDrag = true;
+      }
+
+      dom.selectRect.style.left = x + 'px';
+      dom.selectRect.style.top = y + 'px';
+      dom.selectRect.style.width = w + 'px';
+      dom.selectRect.style.height = h + 'px';
+
+      // Hit-test file items
+      const selRect = { left: x, top: y, right: x + w, bottom: y + h };
+      const items = state.viewMode === 'icon'
+        ? dom.iconGrid.querySelectorAll('.file-item')
+        : dom.listView.querySelectorAll('.list-row');
+
+      const newSelection = new Set();
+      items.forEach((item, i) => {
+        const itemRect = item.getBoundingClientRect();
+        // Convert item rect to content-area-relative coords
+        const ir = {
+          left: itemRect.left - rect.left + dom.contentArea.scrollLeft,
+          top: itemRect.top - rect.top + dom.contentArea.scrollTop,
+          right: itemRect.right - rect.left + dom.contentArea.scrollLeft,
+          bottom: itemRect.bottom - rect.top + dom.contentArea.scrollTop,
+        };
+        // Check intersection
+        if (ir.left < selRect.right && ir.right > selRect.left &&
+            ir.top < selRect.bottom && ir.bottom > selRect.top) {
+          newSelection.add(i);
+        }
+      });
+
+      state.selectedFiles = newSelection;
+      renderFiles();
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (!dragSelect.active) return;
+      dragSelect.active = false;
+      dom.selectRect.classList.add('hidden');
     });
     
     // Window resize — close sidebar on desktop
