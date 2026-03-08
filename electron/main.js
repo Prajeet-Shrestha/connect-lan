@@ -372,18 +372,7 @@ function createWindow() {
   mainWindow.on('resize', saveWindowState);
   mainWindow.on('move', saveWindowState);
 
-  // ─── Download Handling ─────────────────────────────
-  session.defaultSession.on('will-download', (event, item) => {
-    const suggestedName = item.getFilename();
-    const downloadPath = dialog.showSaveDialogSync(mainWindow, {
-      defaultPath: suggestedName,
-    });
-    if (downloadPath) {
-      item.setSavePath(downloadPath);
-    } else {
-      item.cancel();
-    }
-  });
+
 
   // ─── External Link Guard ──────────────────────────
   mainWindow.webContents.on('will-navigate', (event, url) => {
@@ -502,18 +491,7 @@ async function createRemoteWindow(url) {
     callback(false);
   });
 
-  // Download handling for remote window
-  remoteWin.webContents.session.on('will-download', (event, item) => {
-    const suggestedName = item.getFilename();
-    const downloadPath = dialog.showSaveDialogSync(remoteWin, {
-      defaultPath: suggestedName,
-    });
-    if (downloadPath) {
-      item.setSavePath(downloadPath);
-    } else {
-      item.cancel();
-    }
-  });
+
 
   // External links → system browser
   remoteWin.webContents.setWindowOpenHandler(({ url }) => {
@@ -625,6 +603,58 @@ if (!gotLock) {
   });
 
   app.whenReady().then(async () => {
+
+    // ─── Download Handling (single centralized handler) ──
+    // On Wayland, dialog.showSaveDialogSync crashes (SIGTRAP) if the parent
+    // window's surface has an invalid role (e.g. hidden). We must only use
+    // visible, non-destroyed windows and wrap in try-catch as a safety net.
+    session.defaultSession.on('will-download', (_event, item) => {
+      const isUsable = (win) => win && !win.isDestroyed() && win.isVisible();
+
+      // 1. Try the window that initiated the download
+      let parentWin = null;
+      const wc = item.getWebContents();
+      if (wc) {
+        const ownerWin = BrowserWindow.fromWebContents(wc);
+        if (isUsable(ownerWin)) parentWin = ownerWin;
+      }
+      // 2. Focused window
+      if (!parentWin) {
+        const focused = BrowserWindow.getFocusedWindow();
+        if (isUsable(focused)) parentWin = focused;
+      }
+      // 3. Main window (only if visible)
+      if (!parentWin && isUsable(mainWindow)) {
+        parentWin = mainWindow;
+      }
+
+      try {
+        const opts = { defaultPath: item.getFilename() };
+        // Show dialog attached to parent, or un-parented as last resort
+        const downloadPath = parentWin
+          ? dialog.showSaveDialogSync(parentWin, opts)
+          : dialog.showSaveDialogSync(opts);
+        if (downloadPath) {
+          item.setSavePath(downloadPath);
+        } else {
+          item.cancel();
+        }
+      } catch (e) {
+        console.error('[download] Save dialog failed:', e.message);
+        // Fallback: try un-parented dialog (avoids Wayland surface crash)
+        try {
+          const downloadPath = dialog.showSaveDialogSync({ defaultPath: item.getFilename() });
+          if (downloadPath) {
+            item.setSavePath(downloadPath);
+          } else {
+            item.cancel();
+          }
+        } catch (e2) {
+          console.error('[download] Fallback dialog also failed:', e2.message);
+          item.cancel();
+        }
+      }
+    });
 
     // Set About panel
     app.setAboutPanelOptions({
