@@ -273,8 +273,23 @@ html, body {
   padding: 8px 0;
   flex-shrink: 0;
   transition: transform 0.25s ease;
+  display: flex;
+  flex-direction: column;
 }
 .sidebar-section { margin-bottom: 4px; }
+.sidebar-mode-badge {
+  margin: 6px 12px 2px;
+  padding: 3px 10px;
+  background: rgba(0,122,255,0.15);
+  border: 1px solid rgba(0,122,255,0.25);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
 .sidebar-header {
   font-size: 11px; font-weight: 600; color: var(--text-tertiary);
   padding: 8px 16px 4px; text-transform: uppercase; letter-spacing: 0.5px;
@@ -1049,6 +1064,110 @@ html, body {
   line-height: 1.6; margin-bottom: 4px;
 }
 .connect-steps li strong { color: var(--text-primary); }
+
+/* Connect to Another Device button */
+.connect-divider {
+  height: 1px;
+  background: var(--divider);
+  margin: 16px 0;
+}
+.connect-remote-section {
+  margin-top: 8px;
+}
+.connect-remote-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: var(--font);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.connect-remote-btn:hover {
+  background: rgba(0,122,255,0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.connect-remote-btn svg { flex-shrink: 0; }
+
+/* Remote URL Modal */
+.remote-url-overlay {
+  position: fixed; inset: 0; z-index: 700;
+  background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(6px);
+  animation: ctxAppear 0.15s ease;
+}
+.remote-url-modal {
+  background: rgba(45,45,45,0.92);
+  backdrop-filter: blur(40px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  width: 380px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  animation: ctxAppear 0.2s ease;
+}
+.remote-url-body {
+  padding: 20px;
+}
+.remote-url-hint {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+.remote-url-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.remote-url-input:focus { border-color: var(--accent); }
+.remote-url-input::placeholder { color: var(--text-tertiary); }
+.remote-url-error {
+  font-size: 12px;
+  color: var(--red);
+  margin-top: 8px;
+  min-height: 0;
+}
+.remote-url-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.remote-url-actions .dialog-confirm {
+  background: var(--accent);
+}
+.remote-url-actions .dialog-confirm:hover {
+  background: var(--accent-hover);
+}
+.remote-url-actions .dialog-confirm:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* Settings Modal */
+.settings-modal-overlay {
+  position: fixed; inset: 0; z-index: 600;
+  background: rgba(0,0,0,0.55);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(6px);
+  animation: ctxAppear 0.15s ease;
+}
 
 @media (max-width: 768px) {
   .connect-modal {

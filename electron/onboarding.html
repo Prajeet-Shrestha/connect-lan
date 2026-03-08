@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NearDrop — Setup</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1e1e1e;
+      color: #e0e0e0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      -webkit-app-region: drag;
+      user-select: none;
+      padding: 52px 40px 36px;
+    }
+    .logo { margin-bottom: 8px; opacity: 0.9; }
+    .logo svg { width: 40px; height: 40px; stroke: #7eb8ff; }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; color: #fff; }
+    .subtitle { font-size: 13px; color: #888; margin-bottom: 28px; }
+    .cards {
+      display: flex;
+      gap: 16px;
+      -webkit-app-region: no-drag;
+    }
+    .card {
+      width: 230px;
+      background: #2a2a2a;
+      border: 2px solid transparent;
+      border-radius: 12px;
+      padding: 24px 20px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s, transform 0.15s;
+      text-align: center;
+    }
+    .card:hover { background: #303030; transform: translateY(-2px); }
+    .card.selected { border-color: #4a9eff; background: #1e2d42; }
+    .card-icon { margin-bottom: 12px; }
+    .card-icon svg { width: 36px; height: 36px; stroke: #7eb8ff; }
+    .card-title { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+    .card-desc { font-size: 12px; color: #999; line-height: 1.5; margin-bottom: 14px; }
+    .card-features { text-align: left; padding-left: 4px; }
+    .card-features li {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 5px;
+      list-style: none;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .card-features li::before {
+      content: '';
+      display: inline-block;
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: #4a9eff;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+    .continue-btn {
+      -webkit-app-region: no-drag;
+      margin-top: 28px;
+      padding: 10px 40px;
+      background: #4a9eff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    .continue-btn.enabled { opacity: 1; pointer-events: auto; }
+    .continue-btn.enabled:hover { background: #3a8eef; }
+  </style>
+</head>
+<body>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+      <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+    </svg>
+  </div>
+  <h1>Welcome to NearDrop</h1>
+  <p class="subtitle">How would you like to use this device?</p>
+
+  <div class="cards">
+    <div class="card" id="card-host" tabindex="0">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2"/>
+          <path d="M8 21h8M12 17v4"/>
+        </svg>
+      </div>
+      <div class="card-title">Host</div>
+      <div class="card-desc">Share files from this machine. Other devices on your network connect to you.</div>
+      <ul class="card-features">
+        <li>Runs a local file server</li>
+        <li>Generates connection PIN</li>
+        <li>Full file management</li>
+        <li>Other devices browse your files</li>
+      </ul>
+    </div>
+
+    <div class="card" id="card-client" tabindex="0">
+      <div class="card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+        </svg>
+      </div>
+      <div class="card-title">Client</div>
+      <div class="card-desc">Connect to another NearDrop host. Browse and transfer files from their machine.</div>
+      <ul class="card-features">
+        <li>No server needed — lightweight</li>
+        <li>Enter host URL to connect</li>
+        <li>Full read & write access</li>
+        <li>Upload & download files</li>
+      </ul>
+    </div>
+  </div>
+
+  <button class="continue-btn" id="continue-btn">Continue</button>
+
+  <script>
+    const cards = document.querySelectorAll('.card');
+    const continueBtn = document.getElementById('continue-btn');
+    let selectedMode = null;
+
+    cards.forEach(card => {
+      card.addEventListener('click', () => {
+        cards.forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedMode = card.id === 'card-host' ? 'host' : 'client';
+        continueBtn.classList.add('enabled');
+      });
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); card.click(); }
+      });
+    });
+
+    continueBtn.addEventListener('click', () => {
+      if (!selectedMode) return;
+      if (window.electronAPI && window.electronAPI.setMode) {
+        window.electronAPI.setMode(selectedMode);
+      }
+    });
+  </script>
+</body>
+</html>

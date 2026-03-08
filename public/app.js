@@ -114,6 +114,15 @@
     connectPin: $('#connect-pin'),
     connectRefreshPin: $('#connect-refresh-pin'),
     connectTlsStep: $('#connect-tls-step'),
+    connectRemoteSection: $('#connect-remote-section'),
+    btnConnectRemote: $('#btn-connect-remote'),
+    // Remote URL modal
+    remoteUrlOverlay: $('#remote-url-overlay'),
+    remoteUrlClose: $('#remote-url-close'),
+    remoteUrlInput: $('#remote-url-input'),
+    remoteUrlError: $('#remote-url-error'),
+    remoteUrlCancel: $('#remote-url-cancel'),
+    remoteUrlConnect: $('#remote-url-connect'),
     // Folder dialog
     folderDialogOverlay: $('#folder-dialog-overlay'),
     folderNameInput: $('#folder-name-input'),
@@ -129,6 +138,17 @@
     aboutAppdataRow: $('#about-appdata-row'),
     aboutAppdataPath: $('#about-appdata-path'),
     aboutAppdataOpen: $('#about-appdata-open'),
+    // Learn
+    sidebarLearn: $('#sidebar-learn'),
+    learnModalOverlay: $('#learn-modal-overlay'),
+    learnModalClose: $('#learn-modal-close'),
+    // Settings
+    sidebarSettings: $('#sidebar-settings'),
+    sidebarModeBadge: $('#sidebar-mode-badge'),
+    settingsModalOverlay: $('#settings-modal-overlay'),
+    settingsModalClose: $('#settings-modal-close'),
+    settingsCurrentMode: $('#settings-current-mode'),
+    settingsSwitchMode: $('#settings-switch-mode'),
     // Hidden inputs
     fileInput: $('#file-input'),
     folderInput: $('#folder-input'),
@@ -1309,7 +1329,7 @@
         dom.connectRefreshPin.classList.toggle('hidden', !state.isHost);
 
         // TLS step
-        dom.connectTlsStep.classList.toggle('hidden', data.noTls);
+        if (dom.connectTlsStep) dom.connectTlsStep.classList.toggle('hidden', data.noTls);
       }
 
       // Bind copy handlers
@@ -1359,6 +1379,94 @@
       setTimeout(() => dom.connectRefreshPin.classList.remove('spinning'), 600);
     }
   });
+
+  // ─── Connect to Remote Device (Electron only) ──────
+  if (isElectron) {
+    // Show Electron-only UI elements
+    dom.connectRemoteSection.classList.remove('hidden');
+    dom.sidebarSettings.classList.remove('hidden');
+    dom.sidebarModeBadge.textContent = 'Host Mode';
+    dom.sidebarModeBadge.classList.remove('hidden');
+
+    // Open remote URL modal
+    dom.btnConnectRemote.addEventListener('click', () => {
+      closeConnectModal();
+      dom.remoteUrlInput.value = '';
+      dom.remoteUrlError.classList.add('hidden');
+      dom.remoteUrlError.textContent = '';
+      dom.remoteUrlOverlay.classList.remove('hidden');
+      setTimeout(() => dom.remoteUrlInput.focus(), 100);
+    });
+
+    // Close remote URL modal
+    function closeRemoteUrlModal() {
+      dom.remoteUrlOverlay.classList.add('hidden');
+    }
+    dom.remoteUrlClose.addEventListener('click', closeRemoteUrlModal);
+    dom.remoteUrlCancel.addEventListener('click', closeRemoteUrlModal);
+    dom.remoteUrlOverlay.addEventListener('click', (e) => {
+      if (e.target === dom.remoteUrlOverlay) closeRemoteUrlModal();
+    });
+
+    // Submit remote URL
+    dom.remoteUrlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') dom.remoteUrlConnect.click();
+    });
+    dom.remoteUrlInput.addEventListener('input', () => {
+      dom.remoteUrlError.classList.add('hidden');
+    });
+
+    dom.remoteUrlConnect.addEventListener('click', async () => {
+      const url = dom.remoteUrlInput.value.trim();
+      if (!url) {
+        dom.remoteUrlError.textContent = 'Please enter a URL';
+        dom.remoteUrlError.classList.remove('hidden');
+        return;
+      }
+
+      dom.remoteUrlConnect.disabled = true;
+      dom.remoteUrlConnect.textContent = 'Connecting...';
+      dom.remoteUrlError.classList.add('hidden');
+
+      try {
+        const result = await window.electronAPI.openRemoteDevice(url);
+        if (result && result.error) {
+          dom.remoteUrlError.textContent = result.error;
+          dom.remoteUrlError.classList.remove('hidden');
+        } else {
+          closeRemoteUrlModal();
+          showToast('success', 'Remote window opened');
+        }
+      } catch (e) {
+        dom.remoteUrlError.textContent = 'Connection failed';
+        dom.remoteUrlError.classList.remove('hidden');
+      } finally {
+        dom.remoteUrlConnect.disabled = false;
+        dom.remoteUrlConnect.textContent = 'Connect';
+      }
+    });
+  }
+
+  // ─── Settings Modal (Electron only) ────────────────
+  if (isElectron) {
+    dom.sidebarSettings.addEventListener('click', () => {
+      dom.settingsCurrentMode.textContent = 'Host';
+      dom.settingsSwitchMode.textContent = 'Switch to Client Mode';
+      dom.settingsModalOverlay.classList.remove('hidden');
+    });
+
+    function closeSettingsModal() {
+      dom.settingsModalOverlay.classList.add('hidden');
+    }
+    dom.settingsModalClose.addEventListener('click', closeSettingsModal);
+    dom.settingsModalOverlay.addEventListener('click', (e) => {
+      if (e.target === dom.settingsModalOverlay) closeSettingsModal();
+    });
+
+    dom.settingsSwitchMode.addEventListener('click', () => {
+      window.electronAPI.switchMode('client');
+    });
+  }
 
   // ─── Devices ────────────────────────────────────────
   function renderDevices() {
@@ -1613,6 +1721,18 @@
     }
     // Escape to deselect
     if (e.key === 'Escape') {
+      if (!dom.settingsModalOverlay.classList.contains('hidden')) {
+        dom.settingsModalOverlay.classList.add('hidden');
+        return;
+      }
+      if (!dom.remoteUrlOverlay.classList.contains('hidden')) {
+        dom.remoteUrlOverlay.classList.add('hidden');
+        return;
+      }
+      if (!dom.learnModalOverlay.classList.contains('hidden')) {
+        dom.learnModalOverlay.classList.add('hidden');
+        return;
+      }
       if (!dom.aboutModalOverlay.classList.contains('hidden')) {
         closeAboutModal();
         return;
@@ -1704,6 +1824,17 @@
     if (e.target === dom.aboutModalOverlay) closeAboutModal();
   });
 
+  // ─── Learn Modal ───────────────────────────────────
+  dom.sidebarLearn.addEventListener('click', () => {
+    dom.learnModalOverlay.classList.remove('hidden');
+  });
+  dom.learnModalClose.addEventListener('click', () => {
+    dom.learnModalOverlay.classList.add('hidden');
+  });
+  dom.learnModalOverlay.addEventListener('click', (e) => {
+    if (e.target === dom.learnModalOverlay) dom.learnModalOverlay.classList.add('hidden');
+  });
+
   function openAboutModal() {
     const info = state.serverInfo || {};
     dom.aboutVersion.textContent = info.version ? 'v' + info.version : 'v1.0.0';
@@ -1725,7 +1856,7 @@
   }
 
   dom.aboutDonate.addEventListener('click', () => {
-    window.open('https://github.com/Prajeet-Shrestha/neardrop', '_blank');
+    window.open('https://buymemomo.com/davinci', '_blank');
   });
 
   dom.aboutGithub.addEventListener('click', () => {

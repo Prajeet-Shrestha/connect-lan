@@ -86,6 +86,9 @@
       "icon": "build/icon.png",
       "category": "Utility"
     },
+    "deb": {
+      "afterInstall": "build/linux/afterInstall.sh"
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,

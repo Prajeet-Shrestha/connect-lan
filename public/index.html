@@ -115,6 +115,7 @@
       <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
       <!-- SIDEBAR -->
       <div class="sidebar" id="sidebar">
+        <div class="sidebar-mode-badge hidden" id="sidebar-mode-badge">Host Mode</div>
         <div class="sidebar-section">
           <div class="sidebar-header">Favorites</div>
           <div class="sidebar-item active" data-path="" id="sidebar-home">
@@ -142,10 +143,18 @@
             <span class="chat-badge hidden" id="chat-badge">0</span>
           </div>
         </div>
-        <div class="sidebar-section">
+        <div class="sidebar-section" style="margin-top:auto;">
+          <div class="sidebar-item" id="sidebar-learn">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 16 16"><path d="M2 2h4.5a2 2 0 012 2v10a1.5 1.5 0 00-1.5-1.5H2V2z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/><path d="M14 2H9.5a2 2 0 00-2 2v10A1.5 1.5 0 019 12.5H14V2z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/></svg>
+            <span>Learn</span>
+          </div>
           <div class="sidebar-item" id="sidebar-about">
             <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M8 7v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.5" r="0.8" fill="currentColor"/></svg>
             <span>About</span>
+          </div>
+          <div class="sidebar-item hidden" id="sidebar-settings">
+            <svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            <span>Settings</span>
           </div>
         </div>
       </div>
@@ -280,15 +289,32 @@
               </button>
             </div>
           </div>
-          <!-- Steps -->
-          <div class="connect-steps" id="connect-steps">
-            <div class="connect-label">How to connect</div>
-            <ol>
-              <li>Make sure your device is on the <strong>same WiFi network</strong></li>
-              <li>Scan the QR code or open the URL in your browser</li>
-              <li id="connect-tls-step" class="hidden">Tap <strong>Advanced</strong> → <strong>Proceed</strong> to accept the certificate</li>
-              <li>Enter the PIN above to connect</li>
-            </ol>
+          <!-- Connect to Another Device (Electron only) -->
+          <div class="connect-remote-section hidden" id="connect-remote-section">
+            <div class="connect-divider"></div>
+            <button class="connect-remote-btn" id="btn-connect-remote">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+              Connect to Another Device
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REMOTE URL MODAL -->
+    <div class="remote-url-overlay hidden" id="remote-url-overlay">
+      <div class="remote-url-modal">
+        <div class="connect-modal-header">
+          <span class="connect-modal-title"><svg class="inline-icon-lg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>Connect to Remote Host</span>
+          <button class="connect-modal-close" id="remote-url-close">&times;</button>
+        </div>
+        <div class="remote-url-body">
+          <p class="remote-url-hint">Enter the URL shown on the host device's Connect screen.</p>
+          <input type="text" class="remote-url-input" id="remote-url-input" placeholder="http://192.168.1.5:51337" autocomplete="off" spellcheck="false">
+          <div class="remote-url-error hidden" id="remote-url-error"></div>
+          <div class="remote-url-actions">
+            <button class="dialog-btn dialog-cancel" id="remote-url-cancel">Cancel</button>
+            <button class="dialog-btn dialog-confirm" id="remote-url-connect">Connect</button>
           </div>
         </div>
       </div>
@@ -344,6 +370,90 @@
             <div class="about-value about-path-row">
               <span class="about-path-field" id="about-appdata-path">—</span>
               <button class="about-btn-outline about-btn-open" id="about-appdata-open">Open</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS MODAL (Electron only) -->
+    <div class="settings-modal-overlay hidden" id="settings-modal-overlay">
+      <div class="about-modal">
+        <div class="about-modal-header">
+          <span class="about-modal-title">SETTINGS</span>
+          <button class="connect-modal-close" id="settings-modal-close">&times;</button>
+        </div>
+        <div class="about-modal-body">
+          <div class="about-row">
+            <div class="about-label">Current Mode</div>
+            <div class="about-value" id="settings-current-mode">Host</div>
+          </div>
+          <div class="about-row">
+            <div class="about-label">Switch Mode</div>
+            <div class="about-value">
+              <button class="about-btn-outline" id="settings-switch-mode">Switch to Client Mode</button>
+            </div>
+          </div>
+          <div class="about-row">
+            <div class="about-label" style="font-size: 11px; color: #888;">App will restart to apply changes</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LEARN MODAL -->
+    <div class="about-modal-overlay hidden" id="learn-modal-overlay">
+      <div class="about-modal" style="max-width:520px;">
+        <div class="about-modal-header">
+          <span class="about-modal-title">HOW TO USE NEARDROP</span>
+          <button class="connect-modal-close" id="learn-modal-close">&times;</button>
+        </div>
+        <div class="about-modal-body" style="padding:16px 20px 20px;">
+          <div style="margin-bottom:16px;">
+            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4a9eff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+              Host Mode
+            </div>
+            <div style="font-size:12px;color:#aaa;line-height:1.6;">
+              Your device becomes a <strong style="color:#ccc;">file server</strong>. Other devices on the same network can connect to you, browse your shared folder, upload files, and download files. You're the central hub.
+            </div>
+          </div>
+          <div style="margin-bottom:16px;">
+            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff9f43" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+              Client Mode
+            </div>
+            <div style="font-size:12px;color:#aaa;line-height:1.6;">
+              Your device <strong style="color:#ccc;">connects to a host</strong>. You enter the host's URL and PIN to access their shared files. No server runs on your machine — you're just browsing and transferring.
+            </div>
+          </div>
+          <div style="border-top:1px solid #333;padding-top:14px;margin-bottom:14px;">
+            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:8px;">Quick Start</div>
+            <div style="font-size:12px;color:#aaa;line-height:1.7;">
+              <div style="margin-bottom:8px;">
+                <strong style="color:#ccc;">1.</strong> Make sure both devices are on the <strong style="color:#ccc;">same WiFi network</strong>
+              </div>
+              <div style="margin-bottom:8px;">
+                <strong style="color:#ccc;">2.</strong> On one device, launch NearDrop in <strong style="color:#4a9eff;">Host Mode</strong>
+              </div>
+              <div style="margin-bottom:8px;">
+                <strong style="color:#ccc;">3.</strong> On the other device, open NearDrop in <strong style="color:#ff9f43;">Client Mode</strong> — or scan the QR code / open the URL in any browser
+              </div>
+              <div style="margin-bottom:8px;">
+                <strong style="color:#ccc;">4.</strong> Enter the <strong style="color:#ccc;">PIN</strong> shown on the host to connect
+              </div>
+              <div>
+                <strong style="color:#ccc;">5.</strong> Drag & drop files to transfer in either direction!
+              </div>
+            </div>
+          </div>
+          <div style="border-top:1px solid #333;padding-top:14px;">
+            <div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:6px;">Tips</div>
+            <div style="font-size:12px;color:#888;line-height:1.7;">
+              • Use the <strong style="color:#aaa;">Chat</strong> sidebar to send text snippets between devices<br>
+              • You can switch between Host and Client mode from <strong style="color:#aaa;">Settings</strong><br>
+              • Multiple devices can connect to a single host simultaneously<br>
+              • No internet required — everything stays on your local network
             </div>
           </div>
         </div>
