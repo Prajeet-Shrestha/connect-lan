@@ -2,7 +2,7 @@
 
 All notable changes to NearDrop will be documented in this file.
 
-## [Unreleased]
+## [1.1.0] - 2026-03-09
 
 ### Added
 - In-app update download progress banner with percentage and speed (Electron only)
