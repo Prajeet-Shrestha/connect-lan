@@ -1980,6 +1980,14 @@
     window.open('https://buymemomo.com/davinci', '_blank');
   });
 
+  // Sidebar support link
+  const sidebarSupport = $('#sidebar-support');
+  if (sidebarSupport) {
+    sidebarSupport.addEventListener('click', () => {
+      window.open('https://buymemomo.com/davinci', '_blank');
+    });
+  }
+
   dom.aboutGithub.addEventListener('click', () => {
     window.open('https://github.com/Prajeet-Shrestha/neardrop', '_blank');
   });

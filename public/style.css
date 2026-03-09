@@ -315,6 +315,25 @@ html, body {
   min-width: 18px; text-align: center;
 }
 
+/* Sidebar support/momo link */
+.sidebar-support {
+  color: #e84393 !important;
+  transition: all 0.2s;
+}
+.sidebar-support:hover {
+  background: rgba(232,67,147,0.12) !important;
+}
+.sidebar-support .sidebar-icon {
+  color: #e84393;
+  opacity: 1;
+  fill: #e84393;
+  stroke: #e84393;
+  transition: transform 0.3s ease;
+}
+.sidebar-support:hover .sidebar-icon {
+  transform: scale(1.2);
+}
+
 /* Device remove button (host only) */
 .device-remove-btn {
   position: absolute; right: 8px;

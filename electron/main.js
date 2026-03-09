@@ -613,7 +613,7 @@ if (!gotLock) {
 
       // 1. Try the window that initiated the download
       let parentWin = null;
-      const wc = item.getWebContents();
+      const wc = item.webContents;
       if (wc) {
         const ownerWin = BrowserWindow.fromWebContents(wc);
         if (isUsable(ownerWin)) parentWin = ownerWin;

@@ -206,6 +206,25 @@ code { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
   color: var(--text-primary);
   transform: translateY(-1px);
 }
+.btn-star {
+  background: rgba(255, 193, 7, 0.08);
+  color: #ffc107;
+  border: 1px solid rgba(255, 193, 7, 0.25);
+}
+.btn-star:hover {
+  background: rgba(255, 193, 7, 0.15);
+  border-color: rgba(255, 193, 7, 0.4);
+  color: #ffc107;
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(255, 193, 7, 0.15), 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.btn-star svg {
+  transition: transform 0.3s ease;
+}
+.btn-star:hover svg {
+  fill: #ffc107;
+  transform: scale(1.15) rotate(15deg);
+}
 
 /* ─── Hero Terminal (OpenClaw-style) ─── */
 .hero-visual { margin-top: 56px; }
@@ -664,6 +683,32 @@ code { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
   transition: color var(--transition);
 }
 .footer-links a:hover { color: var(--text-primary); }
+.footer-support-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background: rgba(232, 67, 147, 0.1);
+  border: 1px solid rgba(232, 67, 147, 0.25);
+  border-radius: 100px;
+  color: #e84393;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: all var(--transition);
+}
+.footer-support-btn:hover {
+  background: rgba(232, 67, 147, 0.18);
+  border-color: rgba(232, 67, 147, 0.4);
+  color: #e84393;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(232, 67, 147, 0.15);
+}
+.footer-support-btn svg {
+  transition: transform 0.3s ease;
+}
+.footer-support-btn:hover svg {
+  transform: scale(1.2);
+}
 .footer-copy {
   color: var(--text-muted);
   font-size: 0.82rem;
